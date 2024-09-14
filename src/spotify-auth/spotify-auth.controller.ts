@@ -9,12 +9,6 @@ export class SpotifyAuthController {
 
   constructor(private readonly spotifyAuthService: SpotifyAuthService) {}
 
-  @Get()
-  @ApiOperation({ summary: 'Hello world' })
-  getHello(): string {
-    return this.spotifyAuthService.getHello();
-  }
-
   @Get('login')
   @ApiOperation({ summary: "Redirige vers la page d'authentification Spotify" })
   @Redirect()

@@ -4,7 +4,8 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger } from '@nestjs/common';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
+  const app = await NestFactory.create(
+    AppModule, {
     logger: ['log', 'error', 'warn', 'debug', 'verbose'],
   });
 
@@ -29,6 +30,10 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
 
   SwaggerModule.setup('api', app, document);
+
+ app.enableCors({
+    origin: '*',
+  });
 
   await app.listen(3000);
   Logger.log('Application is running on: http://localhost:3000');
