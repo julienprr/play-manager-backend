@@ -23,8 +23,6 @@ export class SpotifyAuthController {
   @ApiOperation({ summary: 'Callback après authentification Spotify' })
   async callback(@Query('code') code: string) {
     this.logger.log('Handling Spotify callback');
-    const tokens = await this.spotifyAuthService.getToken(code);
-    this.logger.debug(`Received tokens: ${JSON.stringify(tokens)}`);
-    return tokens;
+    return await this.spotifyAuthService.handleSpotifyCallback(code);
   }
 }
