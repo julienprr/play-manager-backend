@@ -22,4 +22,20 @@ export class UserService {
     console.log({ user });
     return user;
   }
+
+  async getAccessToken({ spotifyUserId }: { spotifyUserId: string }) {
+    const existingUser = await this.prisma.user.findUnique({
+      where: { spotifyUserId },
+    });
+
+    if (!existingUser) {
+      throw new Error("L'utilisateur n'éxiste pas");
+    }
+
+    if (!existingUser.spotifyAccessToken) {
+      throw new Error("Aucun token d'accès Spotify n'a été trouvé");
+    }
+
+    return { access_token: existingUser.spotifyAccessToken };
+  }
 }

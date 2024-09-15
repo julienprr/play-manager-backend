@@ -22,7 +22,6 @@ module.exports = {
     '@typescript-eslint/explicit-module-boundary-types': 'off',
     '@typescript-eslint/no-explicit-any': 'off',
     '@typescript-eslint/no-unused-vars': 'warn',
-    'prettier/prettier': 'warn', // Assure que les erreurs de Prettier sont signalées comme des erreurs ESLint
-
+    'prettier/prettier': 'warn',
   },
 };

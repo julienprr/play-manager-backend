@@ -25,13 +25,13 @@ export class AuthService {
         throw new Error("L'utilisateur n'existe pas");
       }
 
-      return this.authentificateUser({ userId: existingUser.id });
+      return this.authenticateUser({ userId: existingUser.id });
     } catch (error) {
       return { error: true, message: error.message };
     }
   }
 
-  private async authentificateUser({ userId }: UserPayload) {
+  async authenticateUser({ userId }: UserPayload) {
     const payload: UserPayload = { userId };
     return {
       access_token: this.jwtService.sign(payload),

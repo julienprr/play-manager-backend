@@ -17,7 +17,9 @@ model User {
   id  String @id @default(cuid())
   spotifyUserId String @unique
   email String @unique
-  username String?
+  username String
   spotifyAccessToken String? @unique
+  spotifyAccessTokenTimestamp DateTime?
   spotifyRefreshToken String? @unique
+
 }

@@ -5,6 +5,7 @@ import { SpotifyAuthController } from './spotify-auth.controller';
 import { PrismaService } from 'src/prisma.service';
 import { JwtStrategy } from 'src/auth/jwt.stategy';
 import { JwtModule } from '@nestjs/jwt';
+import { AuthService } from 'src/auth/auth.service';
 
 @Module({
   imports: [
@@ -16,6 +17,6 @@ import { JwtModule } from '@nestjs/jwt';
   ],
   exports: [SpotifyAuthService],
   controllers: [SpotifyAuthController],
-  providers: [SpotifyAuthService, PrismaService, JwtStrategy],
+  providers: [SpotifyAuthService, PrismaService, JwtStrategy, AuthService],
 })
 export class SpotifyAuthModule {}

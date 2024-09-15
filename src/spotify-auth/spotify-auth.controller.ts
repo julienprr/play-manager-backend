@@ -1,6 +1,6 @@
-import { Controller, Get, Query, Redirect, Logger } from '@nestjs/common';
+import { Controller, Get, Logger, Query, Redirect } from '@nestjs/common';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { SpotifyAuthService } from './spotify-auth.service';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
 
 @ApiTags('Spotify Authentication')
 @Controller('spotify-auth')
@@ -19,10 +19,10 @@ export class SpotifyAuthController {
     return { url };
   }
 
-  @Get('callback')
+  @Get('authenticate')
   @ApiOperation({ summary: 'Callback après authentification Spotify' })
-  async callback(@Query('code') code: string) {
-    this.logger.log('Handling Spotify callback');
-    return await this.spotifyAuthService.handleSpotifyCallback(code);
+  async authenticate(@Query('code') code: string) {
+    this.logger.log('Authenticate...');
+    return await this.spotifyAuthService.authenticate(code);
   }
 }

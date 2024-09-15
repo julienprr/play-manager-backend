@@ -1,8 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
 import axios from 'axios';
-import { UserPayload } from 'src/auth/jwt.stategy';
+import { AuthService } from 'src/auth/auth.service';
 import { PrismaService } from 'src/prisma.service';
 
 @Injectable()
@@ -16,7 +15,7 @@ export class SpotifyAuthService {
   constructor(
     private configService: ConfigService,
     private readonly prisma: PrismaService,
-    private readonly jwtService: JwtService,
+    private readonly authService: AuthService,
   ) {
     this.clientId = this.configService.get<string>('SPOTIFY_CLIENT_ID');
     this.clientSecret = this.configService.get<string>('SPOTIFY_CLIENT_SECRET');
@@ -32,42 +31,57 @@ export class SpotifyAuthService {
     return url;
   }
 
-  async getToken(code: string): Promise<any> {
-    this.logger.log('Requesting Spotify access token');
-    const response = await axios.post('https://accounts.spotify.com/api/token', null, {
-      params: {
-        grant_type: 'authorization_code',
-        code,
-        redirect_uri: this.redirectUri,
-        client_id: this.clientId,
-        client_secret: this.clientSecret,
-      },
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-    });
+  async getTokensFromSpotify(code: string) {
+    this.logger.log('Requesting Spotify access token: ', code);
+    this.logger.log('Redirect Uri: ', this.redirectUri);
+    this.logger.log('Client id ', this.clientId);
+    this.logger.log('Client secret: ', this.clientSecret);
 
-    this.logger.debug(`Received token response: ${JSON.stringify(response.data)}`);
-    return response.data;
-  }
-  catch(error) {
-    this.logger.error('Failed to retrieve Spotify token', error);
-    throw error;
+    try {
+      const response = await axios.post('https://accounts.spotify.com/api/token', null, {
+        params: {
+          grant_type: 'authorization_code',
+          code: code,
+          redirect_uri: this.redirectUri,
+          client_id: this.clientId,
+          client_secret: this.clientSecret,
+        },
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      });
+
+      console.log('response', response.data);
+
+      const { access_token, refresh_token } = response.data;
+      return { spotify_access_token: access_token, spotify_refresh_token: refresh_token };
+    } catch (error) {
+      this.logger.error('Failed to retrieve Spotify token', error.message);
+      throw error;
+    }
   }
 
-  async handleSpotifyCallback(code: string) {
+  /**
+   * Échange le code d'autorisation contre un token d'accès Spotify
+   * Créer un nouvel utilisateur en base si c'est la première connexion
+   * Renvoie un token JWT qui identifie l'utilisateur
+   *
+   * @param {string} code Le code d'autorisation Spotify
+   * @returns le token d'accès
+   */
+  async authenticate(code: string) {
     try {
       if (!code) {
         throw new Error("Aucun code n'a été récupéré");
       }
 
-      const { access_token, refresh_token } = await this.getToken(code);
+      const { spotify_access_token, spotify_refresh_token } = await this.getTokensFromSpotify(code);
 
-      if (!access_token) {
+      if (!spotify_access_token) {
         throw new Error("Aucun token n'a été récupéré");
       }
 
-      const userProfile = await this.getUserProfile({ access_token });
+      const userProfile = await this.getUserProfile({ spotify_access_token });
       const existingUser = await this.prisma.user.findUnique({
         where: {
           spotifyUserId: userProfile.id,
@@ -80,36 +94,94 @@ export class SpotifyAuthService {
             spotifyUserId: userProfile.id,
             email: userProfile.email,
             username: userProfile.display_name,
-            spotifyAccessToken: access_token,
-            spotifyRefreshToken: refresh_token,
+            spotifyAccessToken: spotify_access_token,
+            spotifyAccessTokenTimestamp: new Date(),
+            spotifyRefreshToken: spotify_refresh_token,
           },
         });
 
         this.logger.log(`New user created with email ${createdUser.email}`);
-        return await this.authentificateUser({ userId: createdUser.id });
+        return await this.authService.authenticateUser({ userId: createdUser.id });
       }
-      return await this.authentificateUser({ userId: existingUser.id });
+
+      return await this.authService.authenticateUser({ userId: existingUser.id });
     } catch (error) {
       this.logger.error(error);
+      return { error: true, message: error.message, token: '' };
+    }
+  }
+
+  async getSpotifyAccessToken({ userId }: { userId: string }) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new Error('User not found');
+    }
+    const currentTime = new Date();
+    const expirationDate = new Date(user.spotifyAccessTokenTimestamp.getTime() + 3600000);
+
+    if (expirationDate && currentTime > expirationDate) {
+      return { spotify_access_token: user.spotifyAccessToken };
+    }
+
+    // Si le token est expiré, rafraîchir
+    return await this.refreshSpotifyToken(userId);
+  }
+
+  async refreshSpotifyToken(spotifyUserId: string) {
+    const existingUser = await this.prisma.user.findUnique({
+      where: { spotifyUserId },
+    });
+
+    if (!existingUser) {
+      throw new Error("L'utilisateur n'éxiste pas");
+    }
+
+    if (!existingUser.spotifyRefreshToken) {
+      this.logger.error("Aucun token de rafraichissement n'a été touvé");
+      throw new Error('REAUTHENTIFICATION_REQUIRED');
+    }
+
+    try {
+      const response = await axios.post('https://accounts.spotify.com/api/token', null, {
+        params: {
+          grant_type: 'refresh_token',
+          refresh_token: existingUser.spotifyRefreshToken,
+          client_id: this.clientId,
+          client_secret: this.clientSecret,
+        },
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      });
+
+      const { access_token } = response.data;
+
+      // Met à jour le nouvel access_token dans la base de données
+      await this.prisma.user.update({
+        where: { spotifyUserId },
+        data: {
+          spotifyAccessToken: access_token,
+          spotifyAccessTokenTimestamp: new Date(),
+        },
+      });
+
+      return { spotify_access_token: access_token };
+    } catch (error) {
+      this.logger.error('Failed to refresh Spotify token', error);
       return { error: true, message: error.message };
     }
   }
 
-  private async getUserProfile({ access_token: access_token }: { access_token: string }) {
+  private async getUserProfile({ spotify_access_token }: { spotify_access_token: string }) {
+    console.log('getUserProfile');
+
     const response = await axios.get(`https://api.spotify.com/v1/me`, {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        Authorization: `Bearer ${access_token}`,
+        Authorization: `Bearer ${spotify_access_token}`,
       },
     });
 
     return response.data;
-  }
-
-  private async authentificateUser({ userId }: UserPayload) {
-    const payload: UserPayload = { userId };
-    return {
-      access_token: this.jwtService.sign(payload),
-    };
   }
 }

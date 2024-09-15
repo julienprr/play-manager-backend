@@ -1,6 +1,7 @@
-import { Controller, Get, Headers, Logger } from '@nestjs/common';
+import { Controller, Get, Logger, Req, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { JwtAuthGuard } from 'src/auth/jwt.auth.guard';
 import { PlaylistsService } from './playlists.service';
-import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 
 @ApiTags('Playlists')
 @ApiBearerAuth()
@@ -11,11 +12,15 @@ export class PlaylistsController {
   constructor(private readonly playlistsService: PlaylistsService) {}
 
   @Get()
+  async getHello() {
+    return 'HELLO WORLD !';
+  }
+
+  @Get()
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: "Récupère les playlists de l'utilisateur authentifié" })
-  async getPlaylists(@Headers('Authorization') authHeader: string) {
-    this.logger.log('Received request to get playlists ', 'authHeader :', authHeader);
-    const accessToken = authHeader.split(' ')[1];
-    this.logger.debug(`Extracted access token: ${accessToken}`);
-    return await this.playlistsService.getUserPlaylists(accessToken);
+  async getPlaylists(@Req() req) {
+    this.logger.log('Received request to get playlists ', 'authHeader');
+    return await this.playlistsService.getUserPlaylists({ userId: req.user.id });
   }
 }
