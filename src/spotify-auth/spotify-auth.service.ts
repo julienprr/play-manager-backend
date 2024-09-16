@@ -112,24 +112,34 @@ export class SpotifyAuthService {
   }
 
   async getSpotifyAccessToken({ userId }: { userId: string }) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user) {
-      throw new Error('User not found');
-    }
-    const currentTime = new Date();
-    const expirationDate = new Date(user.spotifyAccessTokenTimestamp.getTime() + 3600000);
+    this.logger.log('getSpotifyAccessToken');
+    try {
+      const user = await this.prisma.user.findUnique({ where: { id: userId } });
+      if (!user) {
+        throw new Error("L'utilisateur n'éxiste pas");
+      }
+      const currentTime = new Date();
+      const expirationDate = new Date(user.spotifyAccessTokenTimestamp.getTime() + 3600000);
 
-    if (expirationDate && currentTime > expirationDate) {
-      return { spotify_access_token: user.spotifyAccessToken };
-    }
+      if (expirationDate && currentTime > expirationDate) {
+        return { spotify_access_token: user.spotifyAccessToken };
+      }
 
-    // Si le token est expiré, rafraîchir
-    return await this.refreshSpotifyToken(userId);
+      // Si le token est expiré, rafraîchir
+      return await this.refreshSpotifyToken(userId);
+    } catch (error) {
+      console.error(error);
+      return {
+        error: true,
+        message: error.message,
+      };
+    }
   }
 
-  async refreshSpotifyToken(spotifyUserId: string) {
+  async refreshSpotifyToken(userId: string) {
+    this.logger.log('refreshSpotifyToken');
     const existingUser = await this.prisma.user.findUnique({
-      where: { spotifyUserId },
+      where: { id: userId },
     });
 
     if (!existingUser) {
@@ -158,7 +168,7 @@ export class SpotifyAuthService {
 
       // Met à jour le nouvel access_token dans la base de données
       await this.prisma.user.update({
-        where: { spotifyUserId },
+        where: { id: userId },
         data: {
           spotifyAccessToken: access_token,
           spotifyAccessTokenTimestamp: new Date(),
@@ -174,7 +184,6 @@ export class SpotifyAuthService {
 
   private async getUserProfile({ spotify_access_token }: { spotify_access_token: string }) {
     console.log('getUserProfile');
-
     const response = await axios.get(`https://api.spotify.com/v1/me`, {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',

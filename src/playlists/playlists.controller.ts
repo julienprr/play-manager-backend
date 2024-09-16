@@ -12,15 +12,10 @@ export class PlaylistsController {
   constructor(private readonly playlistsService: PlaylistsService) {}
 
   @Get()
-  async getHello() {
-    return 'HELLO WORLD !';
-  }
-
-  @Get()
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: "Récupère les playlists de l'utilisateur authentifié" })
   async getPlaylists(@Req() req) {
-    this.logger.log('Received request to get playlists ', 'authHeader');
-    return await this.playlistsService.getUserPlaylists({ userId: req.user.id });
+    this.logger.log('Received request to get playlists, token: ', req.user.userId);
+    return await this.playlistsService.getUserPlaylists({ userId: req.user.userId });
   }
 }

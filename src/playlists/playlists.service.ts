@@ -20,7 +20,7 @@ export class PlaylistsService {
       });
 
       if (!existingUser) {
-        throw new Error("L'utilisateur n'éxiste pas");
+        throw new Error("L'utilisateur n'existe pas");
       }
 
       const { spotify_access_token } = await this.spotifyAuthService.getSpotifyAccessToken({ userId: userId });
@@ -34,7 +34,6 @@ export class PlaylistsService {
           Authorization: `Bearer ${spotify_access_token}`,
         },
       });
-      this.logger.debug(`Playlists received: ${JSON.stringify(response.data.items)}`);
       return response.data.items;
     } catch (error) {
       this.logger.error('Failed to fetch playlists', error.stack);
