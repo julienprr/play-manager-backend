@@ -24,9 +24,10 @@ export class SpotifyAuthService {
 
   getAuthorizationUrl() {
     this.logger.log('Generating Spotify authorization URL');
-    const scope = 'user-read-email';
+    const scopes = ['user-read-email', 'user-top-read'];
+    const scopeParam = encodeURIComponent(scopes.join(' '));
     const state = 'some_random_state';
-    const url = `https://accounts.spotify.com/authorize?client_id=${this.clientId}&response_type=code&redirect_uri=${this.redirectUri}&scope=${scope}&state=${state}`;
+    const url = `https://accounts.spotify.com/authorize?client_id=${this.clientId}&response_type=code&redirect_uri=${this.redirectUri}&scope=${scopeParam}&state=${state}`;
 
     return url;
   }
@@ -104,7 +105,21 @@ export class SpotifyAuthService {
         return await this.authService.authenticateUser({ userId: createdUser.id });
       }
 
-      return await this.authService.authenticateUser({ userId: existingUser.id });
+      const updatedUser = await this.prisma.user.update({
+        where: {
+          id: existingUser.id,
+        },
+        data: {
+          spotifyUserId: userProfile.id,
+          email: userProfile.email,
+          username: userProfile.display_name,
+          spotifyAccessToken: spotify_access_token,
+          spotifyAccessTokenTimestamp: new Date(),
+          spotifyRefreshToken: spotify_refresh_token,
+        },
+      });
+
+      return await this.authService.authenticateUser({ userId: updatedUser.id });
     } catch (error) {
       this.logger.error(error);
       return { error: true, message: error.message, token: '' };
