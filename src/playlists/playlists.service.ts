@@ -34,7 +34,18 @@ export class PlaylistsService {
           Authorization: `Bearer ${spotify_access_token}`,
         },
       });
-      return response.data.items;
+
+      const playlists = response.data.items.map((item) => {
+        return {
+          id: item.id,
+          name: item.name,
+          description: item.description,
+          imageUrl: item.images[0]?.url || '',
+          public: item.public,
+        };
+      });
+
+      return { playlists };
     } catch (error) {
       this.logger.error('Failed to fetch playlists', error.stack);
       return {

@@ -118,10 +118,11 @@ export class SpotifyAuthService {
       if (!user) {
         throw new Error("L'utilisateur n'éxiste pas");
       }
+
       const currentTime = new Date();
       const expirationDate = new Date(user.spotifyAccessTokenTimestamp.getTime() + 3600000);
 
-      if (expirationDate && currentTime > expirationDate) {
+      if (expirationDate && currentTime < expirationDate) {
         return { spotify_access_token: user.spotifyAccessToken };
       }
 
