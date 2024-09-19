@@ -6,6 +6,7 @@ import { TopItemOptionsDto } from './dto/top-item-options.dto';
 
 @ApiTags('Playlists')
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('playlists')
 export class PlaylistsController {
   private readonly logger = new Logger(PlaylistsController.name);
@@ -13,15 +14,20 @@ export class PlaylistsController {
   constructor(private readonly playlistsService: PlaylistsService) {}
 
   @Get()
-  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: "Récupère les playlists de l'utilisateur authentifié" })
   async getPlaylists(@Req() req) {
     this.logger.log('Received request to get playlists');
     return await this.playlistsService.getUserPlaylists({ userId: req.user.userId });
   }
 
+  @Get('/:playlistId')
+  @ApiOperation({ summary: "Récupère une playlist de l'utilisateur authentifié en fonction de l'id donné" })
+  async getOnePlaylist(@Req() req, @Param('playlistId') playlistId) {
+    this.logger.log(`Received request to get playlist ${playlistId}`);
+    return await this.playlistsService.getOneUserPlaylist({ userId: req.user.userId, playlistId });
+  }
+
   @Get('/top/:type')
-  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: "Récupère les top items (albums, artistes) de l'utilisateur authentifié" })
   async getTopTrack(@Req() req, @Param('type') type: string, @Query() params: TopItemOptionsDto) {
     this.logger.log('Received request to get Top items');

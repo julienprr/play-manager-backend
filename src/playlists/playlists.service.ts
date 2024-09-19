@@ -57,6 +57,44 @@ export class PlaylistsService {
     }
   }
 
+  async getOneUserPlaylist({ userId, playlistId }: { userId: string; playlistId: string }) {
+    this.logger.log('Fetching single user playlist from Spotify');
+
+    try {
+      const existingUser = await this.prisma.user.findUnique({
+        where: { id: userId },
+      });
+
+      if (!existingUser) {
+        throw new Error("L'utilisateur n'existe pas");
+      }
+
+      const { spotify_access_token } = await this.spotifyAuthService.getSpotifyAccessToken({ userId: userId });
+
+      if (!spotify_access_token) {
+        throw new Error("Aucun token d'accès Spotify n'a été trouvé");
+      }
+
+      const response = await axios.get(`https://api.spotify.com/v1/playlists/${playlistId}`, {
+        headers: {
+          Authorization: `Bearer ${spotify_access_token}`,
+        },
+      });
+
+      const playlist = response.data;
+
+      console.log(playlist.tracks.total);
+
+      return { playlist };
+    } catch (error) {
+      this.logger.error('Failed to fetch playlists', error.stack);
+      return {
+        error: true,
+        message: error.message,
+      };
+    }
+  }
+
   async getUserTopItems({ userId, type, options }: { userId: string; type: string; options: TopItemOptionsDto }) {
     this.logger.log(`Fetching user top ${type} from Spotify`);
 
