@@ -45,6 +45,7 @@ export class PlaylistsService {
           imageUrl: item.images ? item.images[0]?.url : '',
           public: item.public,
           tracksNumber: item.tracks.total || 0,
+          isFavorite: existingUser.favoritePlaylists.includes(item.id),
         };
       });
 

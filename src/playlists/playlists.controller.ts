@@ -34,14 +34,14 @@ export class PlaylistsController {
     return await this.playlistsService.reorganizePlaylist({ userId: req.user.userId, playlistId });
   }
 
-  @Post('favorite/')
+  @Post('favorites/')
   @ApiOperation({ summary: "Ajoute l'id de la playlist aux favoris de l'utilisateur" })
   async addFavorite(@Req() req, @Body('playlistId') playlistId: string) {
     this.logger.log(`Received request to add playlist ${playlistId} to favorite`);
     return await this.playlistsService.addFavoritePlaylist({ userId: req.user.userId, playlistId });
   }
 
-  @Delete('favorite/:playlistId')
+  @Delete('favorites/:playlistId')
   @ApiOperation({ summary: "Ajoute l'id de la playlist aux favoris de l'utilisateur" })
   async removeFavorite(@Req() req, @Param('playlistId') playlistId: string) {
     this.logger.log(`Received request to add playlist ${playlistId} to favorite`);
