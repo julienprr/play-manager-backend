@@ -24,7 +24,13 @@ export class SpotifyAuthService {
 
   getAuthorizationUrl() {
     this.logger.log('Generating Spotify authorization URL');
-    const scopes = ['user-read-email', 'user-top-read'];
+    const scopes = [
+      'user-read-email',
+      'user-top-read',
+      'playlist-read-private',
+      'playlist-modify-private',
+      'playlist-modify-public',
+    ];
     const scopeParam = encodeURIComponent(scopes.join(' '));
     const state = 'some_random_state';
     const url = `https://accounts.spotify.com/authorize?client_id=${this.clientId}&response_type=code&redirect_uri=${this.redirectUri}&scope=${scopeParam}&state=${state}`;
@@ -119,7 +125,8 @@ export class SpotifyAuthService {
         },
       });
 
-      return await this.authService.authenticateUser({ userId: updatedUser.id });
+      const access_token = await this.authService.authenticateUser({ userId: updatedUser.id });
+      return { user: userProfile, ...access_token };
     } catch (error) {
       this.logger.error(error);
       return { error: true, message: error.message, token: '' };

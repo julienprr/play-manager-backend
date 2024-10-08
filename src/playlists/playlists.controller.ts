@@ -1,8 +1,8 @@
-import { Controller, Get, Logger, Param, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Logger, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/jwt.auth.guard';
-import { PlaylistsService } from './playlists.service';
 import { TopItemOptionsDto } from './dto/top-item-options.dto';
+import { PlaylistsService } from './playlists.service';
 
 @ApiTags('Playlists')
 @ApiBearerAuth()
@@ -25,6 +25,27 @@ export class PlaylistsController {
   async getOnePlaylist(@Req() req, @Param('playlistId') playlistId) {
     this.logger.log(`Received request to get playlist ${playlistId}`);
     return await this.playlistsService.getOneUserPlaylist({ userId: req.user.userId, playlistId });
+  }
+
+  @Get('reorganize/:playlistId')
+  @ApiOperation({ summary: "Trie une playlist de l'utilisateur authentifié en fonction de l'id donné" })
+  async ReorganizePlaylist(@Req() req, @Param('playlistId') playlistId) {
+    this.logger.log(`Received request to reorganize playlist ${playlistId}`);
+    return await this.playlistsService.reorganizePlaylist({ userId: req.user.userId, playlistId });
+  }
+
+  @Post('favorite/')
+  @ApiOperation({ summary: "Ajoute l'id de la playlist aux favoris de l'utilisateur" })
+  async addFavorite(@Req() req, @Body('playlistId') playlistId: string) {
+    this.logger.log(`Received request to add playlist ${playlistId} to favorite`);
+    return await this.playlistsService.addFavoritePlaylist({ userId: req.user.userId, playlistId });
+  }
+
+  @Delete('favorite/:playlistId')
+  @ApiOperation({ summary: "Ajoute l'id de la playlist aux favoris de l'utilisateur" })
+  async removeFavorite(@Req() req, @Param('playlistId') playlistId: string) {
+    this.logger.log(`Received request to add playlist ${playlistId} to favorite`);
+    return await this.playlistsService.removeFavoritePlaylist({ userId: req.user.userId, playlistId });
   }
 
   @Get('/top/:type')
