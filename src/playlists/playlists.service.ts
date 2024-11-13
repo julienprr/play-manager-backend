@@ -59,10 +59,7 @@ export class PlaylistsService {
     }
   }
 
-  async getOneUserPlaylist({ userId, playlistId }: { userId: string; playlistId: string }) {
-    this.logger.log('Fetching single user playlist from Spotify');
-    console.log('userId: ', userId);
-
+  async getUserPlaylistById({ userId, playlistId }: { userId: string; playlistId: string }) {
     try {
       const existingUser = await this.prisma.user.findUnique({
         where: { id: userId },
@@ -78,15 +75,33 @@ export class PlaylistsService {
         throw new Error("Aucun token d'accès Spotify n'a été trouvé");
       }
 
-      const response = await axios.get(`https://api.spotify.com/v1/playlists/${playlistId}`, {
-        headers: {
-          Authorization: `Bearer ${spotify_access_token}`,
-        },
-      });
+      if (playlistId === 'liked-tracks') {
+        const response = await axios.get(`https://api.spotify.com/v1/me/tracks`, {
+          headers: {
+            Authorization: `Bearer ${spotify_access_token}`,
+          },
+        });
 
-      const playlist = response.data;
+        const likedTracksPlaylist = {
+          id: 'liked-tracks',
+          name: 'Titres Likés',
+          description: 'Les titres que vous avez ajoutés à vos favoris sur Spotify.',
+          tracks: response.data,
+          total: response.data.total,
+          uri: 'spotify:user:liked-tracks',
+        };
 
-      return { playlist };
+        return { playlist: likedTracksPlaylist };
+      } else {
+        const response = await axios.get(`https://api.spotify.com/v1/playlists/${playlistId}`, {
+          headers: {
+            Authorization: `Bearer ${spotify_access_token}`,
+          },
+        });
+
+        const playlist = response.data;
+        return { playlist };
+      }
     } catch (error) {
       this.logger.error('Failed to fetch playlists', error.stack);
       return {
@@ -161,7 +176,7 @@ export class PlaylistsService {
     }
   }
 
-  private sortTracksByAlbumAndDate(tracks) {
+  private sortTracksByAlbumAndDate(tracks: any[]) {
     const albumsMap = new Map<string, { albumName: string; releaseDate: string; tracks: any[] }>();
 
     tracks.forEach((track) => {
@@ -170,7 +185,7 @@ export class PlaylistsService {
         if (!albumsMap.has(albumId)) {
           albumsMap.set(albumId, {
             albumName: track.track.album.name,
-            releaseDate: track.track.album.release_date, // Format 'YYYY-MM-DD'
+            releaseDate: track.track.album.release_date,
             tracks: [],
           });
         }
@@ -181,14 +196,155 @@ export class PlaylistsService {
 
     // Convertir la map en tableau et trier
     const albumsArray = Array.from(albumsMap.values());
-
     albumsArray.sort((a, b) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime());
 
+    // Trier les pistes dans chaque album par `track_number`
     albumsArray.forEach((album) => {
-      album.tracks.sort((a, b) => a.track_number - b.track_number);
+      album.tracks.sort((a, b) => a.track.track_number - b.track.track_number);
     });
 
     return albumsArray.flatMap((album) => album.tracks);
+  }
+
+  private async retriveTracks({
+    playlistId,
+    spotify_access_token,
+  }: {
+    playlistId: string;
+    spotify_access_token: string;
+  }) {
+    let retrievedTracks: any[] = [];
+
+    if (playlistId == 'liked-tracks') {
+      let nextUrl = `https://api.spotify.com/v1/me/tracks?limit=50`;
+      while (nextUrl) {
+        const response = await axios.get(nextUrl, {
+          headers: {
+            Authorization: `Bearer ${spotify_access_token}`,
+          },
+        });
+        const playlistData = response.data;
+
+        retrievedTracks = retrievedTracks.concat(playlistData.items);
+        nextUrl = playlistData.next;
+        console.log(`${retrievedTracks.length} tracks retrieved`);
+      }
+    } else {
+      let nextUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=100`;
+      while (nextUrl) {
+        const response = await axios.get(nextUrl, {
+          headers: {
+            Authorization: `Bearer ${spotify_access_token}`,
+          },
+        });
+
+        const playlistData = response.data;
+        retrievedTracks = retrievedTracks.concat(playlistData.items);
+        nextUrl = playlistData.next;
+        console.log(`${retrievedTracks.length} tracks retrieved`);
+      }
+    }
+
+    return retrievedTracks;
+  }
+
+  private async deleteTracks({
+    tracks,
+    playlistId,
+    spotify_access_token,
+  }: {
+    tracks: any[];
+    playlistId: string;
+    spotify_access_token: string;
+  }) {
+    let chunkSize: number;
+    if (playlistId == 'liked-tracks') {
+      chunkSize = 50;
+      const trackUrisToRemove = tracks.map((item) => item.track.id);
+      console.log(trackUrisToRemove);
+
+      for (let i = 0; i < trackUrisToRemove.length; i += chunkSize) {
+        const chunk = trackUrisToRemove.slice(i, i + chunkSize);
+        console.log(`deleting tracks ${i} to ${i + chunkSize}`);
+
+        await axios.delete(`https://api.spotify.com/v1/me/tracks`, {
+          headers: {
+            Authorization: `Bearer ${spotify_access_token}`,
+          },
+          data: {
+            ids: chunk,
+          },
+        });
+      }
+    } else {
+      chunkSize = 100;
+      const trackUrisToRemove = tracks.map((item) => item.track.uri);
+
+      console.log(trackUrisToRemove);
+
+      for (let i = 0; i < trackUrisToRemove.length; i += chunkSize) {
+        const chunk = trackUrisToRemove.slice(i, i + chunkSize);
+        console.log(`deleting tracks ${i} to ${i + chunkSize}`);
+
+        await axios.delete(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
+          headers: {
+            Authorization: `Bearer ${spotify_access_token}`,
+          },
+          data: {
+            tracks: chunk.map((uri) => ({ uri })),
+          },
+        });
+      }
+    }
+    console.log('All tracks have been deleted');
+  }
+
+  private async addTracks({
+    sortedTracks,
+    playlistId,
+    spotify_access_token,
+  }: {
+    sortedTracks: any[];
+    playlistId: string;
+    spotify_access_token: string;
+  }) {
+    let chunkSize: number;
+    if (playlistId == 'liked-tracks') {
+      chunkSize = 50;
+      const sortedTrackUris = sortedTracks.map((track) => track.track.uri);
+      console.log('sortedTrackUris: ', sortedTrackUris.length);
+
+      for (let i = 0; i < sortedTrackUris.length; i += chunkSize) {
+        const chunk = sortedTrackUris.slice(i, i + chunkSize);
+        console.log(`adding tracks ${i} to ${i + chunkSize}`);
+
+        await axios.put(
+          `https://api.spotify.com/v1/me/tracks`,
+          {
+            ids: chunk,
+          },
+          { headers: { Authorization: `Bearer ${spotify_access_token}` } },
+        );
+      }
+    } else {
+      chunkSize = 100;
+      const sortedTrackUris = sortedTracks.map((track) => track.track.uri);
+      console.log('sortedTrackUris: ', sortedTrackUris.length);
+
+      for (let i = 0; i < sortedTrackUris.length; i += chunkSize) {
+        const chunk = sortedTrackUris.slice(i, i + chunkSize);
+        console.log(`adding tracks ${i} to ${i + chunkSize}`);
+
+        await axios.post(
+          `https://api.spotify.com/v1/playlists/${playlistId}/tracks`,
+          {
+            uris: chunk,
+          },
+          { headers: { Authorization: `Bearer ${spotify_access_token}` } },
+        );
+      }
+    }
+    console.log('All tracks added successfuly');
   }
 
   async reorganizePlaylist({ userId, playlistId }: { userId: string; playlistId: string }) {
@@ -210,73 +366,58 @@ export class PlaylistsService {
       }
 
       // Fetch all tracks from the playlist, handling pagination if needed
-      let allTracks: any[] = [];
-      let nextUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=100`;
-
-      while (nextUrl) {
-        const response = await axios.get(nextUrl, {
-          headers: {
-            Authorization: `Bearer ${spotify_access_token}`,
-          },
-        });
-        const playlistData = response.data;
-        allTracks = allTracks.concat(playlistData.items);
-        nextUrl = playlistData.next;
-        console.log(`${allTracks.length} tracks retrieved`);
-        console.log(allTracks[0]);
-      }
+      const allTracks = await this.retriveTracks({ playlistId, spotify_access_token });
 
       const validTracks = allTracks.filter(
         (item) => item.track && item.track.uri && item.track.id && item.track.album.id,
       );
 
-      // console.log(validTracks[0]);
-
       console.log(`${validTracks.length} valid tracks to sort`);
-
       // Group and sort as needed, then update the playlist
       const sortedTracks = this.sortTracksByAlbumAndDate(validTracks);
-      console.log('sortedTracks', sortedTracks.length);
+      console.log(`${sortedTracks.length} track sorted`);
 
-      // Chunk the sorted tracks for deletion and re-adding in groups of 100
-      const trackUrisToRemove = validTracks.map((item) => item.track.uri);
-      const chunkSize = 100;
-
-      for (let i = 0; i < trackUrisToRemove.length; i += chunkSize) {
-        const chunk = trackUrisToRemove.slice(i, i + chunkSize);
-        console.log(`deleting ${i} to ${i + chunkSize}`);
-
-        await axios.delete(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
-          headers: {
-            Authorization: `Bearer ${spotify_access_token}`,
-          },
-          data: {
-            tracks: chunk.map((uri) => ({ uri })),
-          },
-        });
-      }
-      console.log('All tracks have been deleted');
+      // delete all tracks
+      await this.deleteTracks({ tracks: validTracks, playlistId, spotify_access_token });
 
       // Re-add the tracks in sorted order
-      const sortedTrackUris = sortedTracks.map((track) => track.track.uri);
-      console.log('sortedTrackUris', sortedTrackUris.length);
+      await this.addTracks({ sortedTracks, playlistId, spotify_access_token });
 
-      for (let i = 0; i < sortedTrackUris.length; i += chunkSize) {
-        const chunk = sortedTrackUris.slice(i, i + chunkSize);
-        console.log(`adding ${i} to ${i + chunkSize}`);
-        console.log(chunk);
+      return { error: false, message: 'Playlist successfully reorganized.' };
+    } catch (error) {
+      this.logger.error('Failed to reorganize playlist', error.stack);
+      return {
+        error: true,
+        message: error.message,
+      };
+    }
+  }
 
-        await axios.post(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
-          headers: {
-            Authorization: `Bearer ${spotify_access_token}`,
-          },
-          data: {
-            uris: chunk,
-          },
-        });
+  async cleanPlaylist({ userId, playlistId }: { userId: string; playlistId: string }) {
+    this.logger.log('Cleaning playlist', playlistId);
+
+    try {
+      const existingUser = await this.prisma.user.findUnique({
+        where: { id: userId },
+      });
+
+      if (!existingUser) {
+        throw new Error("L'utilisateur n'existe pas");
       }
 
-      return { message: 'Playlist successfully reorganized.' };
+      const { spotify_access_token } = await this.spotifyAuthService.getSpotifyAccessToken({ userId: userId });
+
+      if (!spotify_access_token) {
+        throw new Error("Aucun token d'accès Spotify n'a été trouvé");
+      }
+
+      // Fetch all tracks from the playlist, handling pagination if needed
+      const tracks = await this.retriveTracks({ playlistId, spotify_access_token });
+
+      // delete all tracks
+      await this.deleteTracks({ tracks, playlistId, spotify_access_token });
+
+      return { error: false, message: 'Playlist successfully cleaned.' };
     } catch (error) {
       this.logger.error('Failed to reorganize playlist', error.stack);
       return {

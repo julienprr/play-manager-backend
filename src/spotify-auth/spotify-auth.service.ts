@@ -30,6 +30,8 @@ export class SpotifyAuthService {
       'playlist-read-private',
       'playlist-modify-private',
       'playlist-modify-public',
+      'user-library-read',
+      'user-library-modify',
     ];
     const scopeParam = encodeURIComponent(scopes.join(' '));
     const state = 'some_random_state';

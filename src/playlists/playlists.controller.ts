@@ -24,14 +24,21 @@ export class PlaylistsController {
   @ApiOperation({ summary: "Récupère une playlist de l'utilisateur authentifié en fonction de l'id donné" })
   async getOnePlaylist(@Req() req, @Param('playlistId') playlistId) {
     this.logger.log(`Received request to get playlist ${playlistId}`);
-    return await this.playlistsService.getOneUserPlaylist({ userId: req.user.userId, playlistId });
+    return await this.playlistsService.getUserPlaylistById({ userId: req.user.userId, playlistId });
   }
 
-  @Get('reorganize/:playlistId')
+  @Post('reorganize/')
   @ApiOperation({ summary: "Trie une playlist de l'utilisateur authentifié en fonction de l'id donné" })
-  async ReorganizePlaylist(@Req() req, @Param('playlistId') playlistId) {
+  async ReorganizePlaylist(@Req() req, @Body('playlistId') playlistId: string) {
     this.logger.log(`Received request to reorganize playlist ${playlistId}`);
     return await this.playlistsService.reorganizePlaylist({ userId: req.user.userId, playlistId });
+  }
+
+  @Delete('clean/:playlistId')
+  @ApiOperation({ summary: "Vide une playlist de l'utilisateur authentifié en fonction de l'id donné" })
+  async cleanPlaylist(@Req() req, @Param('playlistId') playlistId: string) {
+    this.logger.log(`Received request to clean playlist ${playlistId}`);
+    return await this.playlistsService.cleanPlaylist({ userId: req.user.userId, playlistId });
   }
 
   @Post('favorites/')
