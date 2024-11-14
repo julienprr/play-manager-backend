@@ -3,6 +3,8 @@ import axios from 'axios';
 import { PrismaService } from 'src/prisma.service';
 import { SpotifyAuthService } from 'src/spotify-auth/spotify-auth.service';
 import { TopItemOptionsDto, TypeOption } from './dto/top-item-options.dto';
+import { plainToInstance } from 'class-transformer';
+import { PlaylistItemDto } from './dto/playlist-item.dto';
 
 @Injectable()
 export class PlaylistsService {
@@ -36,7 +38,7 @@ export class PlaylistsService {
         },
       });
 
-      const playlists = response.data.items.map((item) => {
+      const playlistsData = response.data.items.map((item: any) => {
         return {
           id: item.id,
           name: item.name,
@@ -48,6 +50,8 @@ export class PlaylistsService {
           isFavorite: existingUser.favoritePlaylists.includes(item.id),
         };
       });
+
+      const playlists = plainToInstance(PlaylistItemDto, playlistsData);
 
       return { playlists };
     } catch (error) {
@@ -300,22 +304,22 @@ export class PlaylistsService {
   }
 
   private async addTracks({
-    sortedTracks,
+    tracks,
     playlistId,
     spotify_access_token,
   }: {
-    sortedTracks: any[];
+    tracks: any[];
     playlistId: string;
     spotify_access_token: string;
   }) {
     let chunkSize: number;
     if (playlistId == 'liked-tracks') {
       chunkSize = 50;
-      const sortedTrackUris = sortedTracks.map((track) => track.track.uri);
-      console.log('sortedTrackUris: ', sortedTrackUris.length);
+      const tracksUris = tracks.map((track) => track.track.uri);
+      console.log('sortedTrackUris: ', tracksUris.length);
 
-      for (let i = 0; i < sortedTrackUris.length; i += chunkSize) {
-        const chunk = sortedTrackUris.slice(i, i + chunkSize);
+      for (let i = 0; i < tracksUris.length; i += chunkSize) {
+        const chunk = tracksUris.slice(i, i + chunkSize);
         console.log(`adding tracks ${i} to ${i + chunkSize}`);
 
         await axios.put(
@@ -328,7 +332,7 @@ export class PlaylistsService {
       }
     } else {
       chunkSize = 100;
-      const sortedTrackUris = sortedTracks.map((track) => track.track.uri);
+      const sortedTrackUris = tracks.map((track) => track.track.uri);
       console.log('sortedTrackUris: ', sortedTrackUris.length);
 
       for (let i = 0; i < sortedTrackUris.length; i += chunkSize) {
@@ -381,11 +385,62 @@ export class PlaylistsService {
       await this.deleteTracks({ tracks: validTracks, playlistId, spotify_access_token });
 
       // Re-add the tracks in sorted order
-      await this.addTracks({ sortedTracks, playlistId, spotify_access_token });
+      await this.addTracks({ tracks: sortedTracks, playlistId, spotify_access_token });
 
       return { error: false, message: 'Playlist successfully reorganized.' };
     } catch (error) {
       this.logger.error('Failed to reorganize playlist', error.stack);
+      return {
+        error: true,
+        message: error.message,
+      };
+    }
+  }
+
+  async copyPlaylistContent({
+    userId,
+    playlistSourceId,
+    playlistDestinationId,
+  }: {
+    userId: string;
+    playlistSourceId: string;
+    playlistDestinationId: string;
+  }) {
+    this.logger.log(`Coping content from playlist ${playlistSourceId} to playlist ${playlistDestinationId}`);
+
+    try {
+      const existingUser = await this.prisma.user.findUnique({
+        where: { id: userId },
+      });
+
+      if (!existingUser) {
+        throw new Error("L'utilisateur n'existe pas");
+      }
+
+      const { spotify_access_token } = await this.spotifyAuthService.getSpotifyAccessToken({ userId: userId });
+
+      if (!spotify_access_token) {
+        throw new Error("Aucun token d'accès Spotify n'a été trouvé");
+      }
+
+      // Fetch all tracks from the playlist, handling pagination if needed
+      const sourceTracks = await this.retriveTracks({ playlistId: playlistSourceId, spotify_access_token });
+
+      const validTracks = sourceTracks.filter(
+        (item) => item.track && item.track.uri && item.track.id && item.track.album.id,
+      );
+
+      console.log(`${validTracks.length} tracks to copy`);
+
+      // delete all tracks from the destination playlist
+      await this.cleanPlaylist({ userId, playlistId: playlistDestinationId });
+
+      // Re-add the tracks in the destination playlist
+      await this.addTracks({ tracks: validTracks, playlistId: playlistDestinationId, spotify_access_token });
+
+      return { error: false, message: 'Playlist successfully copied.' };
+    } catch (error) {
+      this.logger.error('Failed to copie playlist', error.stack);
       return {
         error: true,
         message: error.message,

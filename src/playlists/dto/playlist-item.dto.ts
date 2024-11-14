@@ -1,5 +1,5 @@
 import { Expose } from 'class-transformer';
-import { IsString } from 'class-validator';
+import { IsBoolean, IsNumber, IsString } from 'class-validator';
 
 export class PlaylistItemDto {
   @IsString()
@@ -12,9 +12,25 @@ export class PlaylistItemDto {
 
   @IsString()
   @Expose()
+  ownerName: string;
+
+  @IsString()
+  @Expose()
   description: string;
 
   @IsString()
   @Expose()
   imgageUrl?: string;
+
+  @IsBoolean()
+  @Expose()
+  public: string;
+
+  @IsBoolean()
+  @Expose()
+  isFavorite: string;
+
+  @IsNumber()
+  @Expose()
+  tracksNumber: string;
 }

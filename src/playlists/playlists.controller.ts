@@ -34,6 +34,21 @@ export class PlaylistsController {
     return await this.playlistsService.reorganizePlaylist({ userId: req.user.userId, playlistId });
   }
 
+  @Post('copy/')
+  @ApiOperation({ summary: "Copie le contenu d'une playlist de l'utilisateur vers une autre" })
+  async CopyPlaylistContent(
+    @Req() req,
+    @Body('playlistSourceId') playlistSourceId: string,
+    @Body('playlistDestinationId') playlistDestinationId: string,
+  ) {
+    this.logger.log(`Received request to copy playlist ${playlistSourceId} to playlist ${playlistDestinationId}`);
+    return await this.playlistsService.copyPlaylistContent({
+      userId: req.user.userId,
+      playlistSourceId,
+      playlistDestinationId,
+    });
+  }
+
   @Delete('clean/:playlistId')
   @ApiOperation({ summary: "Vide une playlist de l'utilisateur authentifié en fonction de l'id donné" })
   async cleanPlaylist(@Req() req, @Param('playlistId') playlistId: string) {
