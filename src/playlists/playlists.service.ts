@@ -315,7 +315,7 @@ export class PlaylistsService {
     let chunkSize: number;
     if (playlistId == 'liked-tracks') {
       chunkSize = 50;
-      const tracksUris = tracks.map((track) => track.track.uri);
+      const tracksUris = tracks.map((track) => track.track.id);
       console.log('sortedTrackUris: ', tracksUris.length);
 
       for (let i = 0; i < tracksUris.length; i += chunkSize) {
@@ -332,7 +332,7 @@ export class PlaylistsService {
       }
     } else {
       chunkSize = 100;
-      const sortedTrackUris = tracks.map((track) => track.track.uri);
+      const sortedTrackUris = tracks.map((track) => track.track.id);
       console.log('sortedTrackUris: ', sortedTrackUris.length);
 
       for (let i = 0; i < sortedTrackUris.length; i += chunkSize) {
@@ -432,11 +432,40 @@ export class PlaylistsService {
 
       console.log(`${validTracks.length} tracks to copy`);
 
-      // delete all tracks from the destination playlist
-      await this.cleanPlaylist({ userId, playlistId: playlistDestinationId });
+      if (playlistDestinationId === 'new-playlist') {
+        const sourcePlaylistResponse = await axios.get(`https://api.spotify.com/v1/playlists/${playlistSourceId}`, {
+          headers: {
+            Authorization: `Bearer ${spotify_access_token}`,
+          },
+        });
+
+        const sourcePlaylist = sourcePlaylistResponse.data;
+        console.log(sourcePlaylist.name, sourcePlaylist.id);
+        console.log(existingUser.spotifyUserId);
+
+        const newPlaylistResponse = await axios.post(
+          `https://api.spotify.com/v1/users/${existingUser.spotifyUserId}/playlists`,
+          {
+            headers: { Authorization: `Bearer ${spotify_access_token}` },
+            data: {
+              name: `${sourcePlaylist.name} copy`,
+              description: sourcePlaylist.description,
+              public: sourcePlaylist.public,
+            },
+          },
+        );
+
+        const newPlaylist = newPlaylistResponse.data;
+
+        this.logger.log(`The new playlist with id ${newPlaylist.id} has been created`);
+        await this.cleanPlaylist({ userId, playlistId: newPlaylist.id });
+      } else {
+        // delete all tracks from the destination playlist
+        await this.cleanPlaylist({ userId, playlistId: playlistDestinationId });
+      }
 
       // Re-add the tracks in the destination playlist
-      await this.addTracks({ tracks: validTracks, playlistId: playlistDestinationId, spotify_access_token });
+      // await this.addTracks({ tracks: validTracks, playlistId: playlistDestinationId, spotify_access_token });
 
       return { error: false, message: 'Playlist successfully copied.' };
     } catch (error) {
