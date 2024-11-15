@@ -221,20 +221,21 @@ export class PlaylistsService {
 
     if (playlistId == 'liked-tracks') {
       let nextUrl = `https://api.spotify.com/v1/me/tracks?limit=50`;
+
       while (nextUrl) {
         const response = await axios.get(nextUrl, {
           headers: {
             Authorization: `Bearer ${spotify_access_token}`,
           },
         });
-        const playlistData = response.data;
 
+        const playlistData = response.data;
         retrievedTracks = retrievedTracks.concat(playlistData.items);
         nextUrl = playlistData.next;
-        console.log(`${retrievedTracks.length} tracks retrieved`);
       }
     } else {
       let nextUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=100`;
+
       while (nextUrl) {
         const response = await axios.get(nextUrl, {
           headers: {
@@ -245,9 +246,9 @@ export class PlaylistsService {
         const playlistData = response.data;
         retrievedTracks = retrievedTracks.concat(playlistData.items);
         nextUrl = playlistData.next;
-        console.log(`${retrievedTracks.length} tracks retrieved`);
       }
     }
+    console.log(`${retrievedTracks.length} tracks retrieved`);
 
     return retrievedTracks;
   }
@@ -314,12 +315,12 @@ export class PlaylistsService {
   }) {
     let chunkSize: number;
     if (playlistId == 'liked-tracks') {
-      chunkSize = 50;
-      const tracksUris = tracks.map((track) => track.track.id);
-      console.log('sortedTrackUris: ', tracksUris.length);
+      const tracksIds = tracks.map((track) => track.track.id);
+      console.log('tracks: ', tracksIds.length);
+      chunkSize = Math.min(50, tracksIds.length);
 
-      for (let i = 0; i < tracksUris.length; i += chunkSize) {
-        const chunk = tracksUris.slice(i, i + chunkSize);
+      for (let i = 0; i < tracksIds.length; i += chunkSize) {
+        const chunk = tracksIds.slice(i, i + chunkSize);
         console.log(`adding tracks ${i} to ${i + chunkSize}`);
 
         await axios.put(
@@ -331,12 +332,12 @@ export class PlaylistsService {
         );
       }
     } else {
-      chunkSize = 100;
-      const sortedTrackUris = tracks.map((track) => track.track.id);
-      console.log('sortedTrackUris: ', sortedTrackUris.length);
+      const tracksUris = tracks.map((track) => track.track.uri);
+      console.log('tracks: ', tracksUris.length);
+      chunkSize = Math.min(100, tracksUris.length);
 
-      for (let i = 0; i < sortedTrackUris.length; i += chunkSize) {
-        const chunk = sortedTrackUris.slice(i, i + chunkSize);
+      for (let i = 0; i < tracksUris.length; i += chunkSize) {
+        const chunk = tracksUris.slice(i, i + chunkSize);
         console.log(`adding tracks ${i} to ${i + chunkSize}`);
 
         await axios.post(
@@ -465,8 +466,9 @@ export class PlaylistsService {
       }
 
       // Re-add the tracks in the destination playlist
-      // await this.addTracks({ tracks: validTracks, playlistId: playlistDestinationId, spotify_access_token });
+      await this.addTracks({ tracks: validTracks, playlistId: playlistDestinationId, spotify_access_token });
 
+      this.logger.log('The playlist has been copied succesfully');
       return { error: false, message: 'Playlist successfully copied.' };
     } catch (error) {
       this.logger.error('Failed to copie playlist', error.stack);
@@ -478,7 +480,7 @@ export class PlaylistsService {
   }
 
   async cleanPlaylist({ userId, playlistId }: { userId: string; playlistId: string }) {
-    this.logger.log('Cleaning playlist', playlistId);
+    this.logger.log(`Cleaning playlist with id ${playlistId}`);
 
     try {
       const existingUser = await this.prisma.user.findUnique({
@@ -498,8 +500,9 @@ export class PlaylistsService {
       // Fetch all tracks from the playlist, handling pagination if needed
       const tracks = await this.retriveTracks({ playlistId, spotify_access_token });
 
-      // delete all tracks
-      await this.deleteTracks({ tracks, playlistId, spotify_access_token });
+      if (tracks.length > 0) {
+        await this.deleteTracks({ tracks, playlistId, spotify_access_token });
+      }
 
       return { error: false, message: 'Playlist successfully cleaned.' };
     } catch (error) {
