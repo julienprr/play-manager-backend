@@ -70,6 +70,20 @@ export class PlaylistsController {
     return await this.playlistsService.removeFavoritePlaylist({ userId: req.user.userId, playlistId });
   }
 
+  @Post('auto-sort/')
+  @ApiOperation({ summary: "Ajoute l'id de la playlist aux playlists auto sorted de l'utilisateur" })
+  async addAutoSort(@Req() req, @Body('playlistId') playlistId: string) {
+    this.logger.log(`Received request to add playlist ${playlistId} to auto sorted`);
+    return await this.playlistsService.addAutoSortPlaylist({ userId: req.user.userId, playlistId });
+  }
+
+  @Delete('auto-sort/:playlistId')
+  @ApiOperation({ summary: "Supprime l'id de la playlist aux playlists auto sorted de l'utilisateur" })
+  async removeAutoSort(@Req() req, @Param('playlistId') playlistId: string) {
+    this.logger.log(`Received request to remove playlist ${playlistId} from auto sorted`);
+    return await this.playlistsService.removeAutoSortPlaylist({ userId: req.user.userId, playlistId });
+  }
+
   @Get('/top/:type')
   @ApiOperation({ summary: "Récupère les top items (albums, artistes) de l'utilisateur authentifié" })
   async getTopTrack(@Req() req, @Param('type') type: string, @Query() params: TopItemOptionsDto) {

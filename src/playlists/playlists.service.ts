@@ -48,6 +48,7 @@ export class PlaylistsService {
           public: item.public,
           tracksNumber: item.tracks.total || 0,
           isFavorite: existingUser.favoritePlaylists.includes(item.id),
+          autoSort: existingUser.autoSortPlaylists.includes(item.id),
         };
       });
 
@@ -603,6 +604,102 @@ export class PlaylistsService {
       }
     } catch (error) {
       this.logger.error('La supression du favoris a échouée', error.stack);
+      return {
+        error: true,
+        message: error.message,
+      };
+    }
+  }
+
+  async addAutoSortPlaylist({ userId, playlistId }: { userId: string; playlistId: string }) {
+    this.logger.log('Adding auto sorted', playlistId);
+
+    try {
+      const existingUser = await this.prisma.user.findUnique({
+        where: { id: userId },
+      });
+
+      if (!existingUser) {
+        throw new Error("L'utilisateur n'existe pas");
+      }
+
+      const { spotify_access_token } = await this.spotifyAuthService.getSpotifyAccessToken({ userId: userId });
+
+      if (!spotify_access_token) {
+        throw new Error("Aucun token d'accès Spotify n'a été trouvé");
+      }
+
+      if (existingUser.autoSortPlaylists.includes(playlistId)) {
+        return {
+          error: true,
+          message: 'La playlist est déjà en auto sorted.',
+        };
+      } else {
+        const updatedAutoSort = existingUser.autoSortPlaylists.concat(playlistId);
+        await this.prisma.user.update({
+          where: {
+            id: userId,
+          },
+          data: {
+            autoSortPlaylists: updatedAutoSort,
+          },
+        });
+
+        return {
+          error: false,
+          message: "La playlist a bien été ajouté aux playlists auto sorted de l'utilisateur.",
+        };
+      }
+    } catch (error) {
+      this.logger.error("L'ajout de la playlist auto sorted a échoué", error.stack);
+      return {
+        error: true,
+        message: error.message,
+      };
+    }
+  }
+
+  async removeAutoSortPlaylist({ userId, playlistId }: { userId: string; playlistId: string }) {
+    this.logger.log('Removing auto sorted playlist', playlistId);
+
+    try {
+      const existingUser = await this.prisma.user.findUnique({
+        where: { id: userId },
+      });
+
+      if (!existingUser) {
+        throw new Error("L'utilisateur n'existe pas");
+      }
+
+      const { spotify_access_token } = await this.spotifyAuthService.getSpotifyAccessToken({ userId: userId });
+
+      if (!spotify_access_token) {
+        throw new Error("Aucun token d'accès Spotify n'a été trouvé");
+      }
+
+      if (!existingUser.autoSortPlaylists.includes(playlistId)) {
+        return {
+          error: true,
+          message: "La playlist ne fait pas partie des playlists auto sorted de l'utilisateur.",
+        };
+      } else {
+        const updatedPlaylists = existingUser.autoSortPlaylists.filter((playlistId) => playlistId !== playlistId);
+        await this.prisma.user.update({
+          where: {
+            id: userId,
+          },
+          data: {
+            autoSortPlaylists: updatedPlaylists,
+          },
+        });
+
+        return {
+          error: false,
+          message: "La playlist a bien été retirée des playlists auto sorted de l'utilisateur.",
+        };
+      }
+    } catch (error) {
+      this.logger.error('La supression de la playlist auto sorted a échouée', error.stack);
       return {
         error: true,
         message: error.message,

@@ -30,6 +30,10 @@ export class PlaylistItemDto {
   @Expose()
   isFavorite: string;
 
+  @IsBoolean()
+  @Expose()
+  autoSort: string;
+
   @IsNumber()
   @Expose()
   tracksNumber: string;
