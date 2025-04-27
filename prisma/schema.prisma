@@ -14,12 +14,36 @@ datasource db {
 }
 
 model User {
-  id  String @id @default(cuid())
-  spotifyUserId String @unique
-  email String @unique
-  username String
-  spotifyAccessToken String? @unique
+  id                         String   @id @default(cuid())
+  spotifyUserId              String   @unique
+  email                      String   @unique
+  username                   String
+  spotifyAccessToken         String?  @unique
   spotifyAccessTokenTimestamp DateTime?
-  spotifyRefreshToken String? @unique
-  favoritePlaylists String[]
+  spotifyRefreshToken        String?  @unique
+
+  playlists                  Playlist[]
+  favoritePlaylists          FavoritePlaylist[]
+}
+
+model Playlist {
+  id        String   @id @default(cuid())
+  name      String
+  userId    String
+  autoSort  Boolean  @default(false)
+
+  user      User     @relation(fields: [userId], references: [id])
+  favoritedBy FavoritePlaylist[]
+}
+
+model FavoritePlaylist {
+  id         String   @id @default(cuid())
+  userId     String
+  playlistId String
+  createdAt  DateTime @default(now())
+
+  user       User     @relation(fields: [userId], references: [id])
+  playlist   Playlist @relation(fields: [playlistId], references: [id])
+
+  @@unique([userId, playlistId])
 }
