@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -14,14 +8,13 @@ datasource db {
 }
 
 model User {
-  id                          String   @id @default(cuid())
-  spotifyUserId               String   @unique
-  email                       String   @unique
+  id                          String    @id @default(cuid())
+  spotifyUserId               String    @unique
+  email                       String    @unique
   username                    String
-  spotifyAccessToken          String?  @unique
+  spotifyAccessToken          String?   @unique
   spotifyAccessTokenTimestamp DateTime?
-  spotifyRefreshToken         String?  @unique
-
-  favoritePlaylists           String[] // IDs des playlists favorites Spotify
-  autoSortPlaylists           String[] // IDs des playlists à trier automatiquement
+  spotifyRefreshToken         String?   @unique
+  autoSortPlaylists           String[]
+  favoritePlaylists           String[]
 }
