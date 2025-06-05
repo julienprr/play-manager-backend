@@ -4,7 +4,8 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger } from '@nestjs/common';
 
 async function bootstrap() {
-  const port = process.env.PORT;
+  const port = parseInt(process.env.PORT ?? '8000', 10);
+  const host = '0.0.0.0';
 
   const app = await NestFactory.create(AppModule, {
     logger: ['log', 'error', 'warn', 'debug', 'verbose'],
@@ -29,14 +30,14 @@ async function bootstrap() {
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-
   SwaggerModule.setup('doc', app, document);
 
   app.enableCors({
-    origin: '*',
+    origin: process.env.CORS_ORIGIN?.split(',') || true,
+    credentials: true,
   });
 
-  await app.listen(port);
-  Logger.log(`Application is running on: http://localhost:${port}`);
+  await app.listen(port, host);
+  Logger.log(`Application is running on: http://${host}:${port}`);
 }
 bootstrap();
