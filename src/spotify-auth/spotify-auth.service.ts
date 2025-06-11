@@ -32,6 +32,7 @@ export class SpotifyAuthService {
       'playlist-modify-public',
       'user-library-read',
       'user-library-modify',
+      'user-follow-read',
     ];
     const scopeParam = encodeURIComponent(scopes.join(' '));
     const state = 'some_random_state';
@@ -41,10 +42,8 @@ export class SpotifyAuthService {
   }
 
   async getTokensFromSpotify(code: string) {
-    this.logger.log('Requesting Spotify access token: ', code);
+    this.logger.log('Requesting Spotify access token with code: ', code);
     this.logger.log('Redirect Uri: ', this.redirectUri);
-    this.logger.log('Client id ', this.clientId);
-    this.logger.log('Client secret: ', this.clientSecret);
 
     try {
       const response = await axios.post('https://accounts.spotify.com/api/token', null, {
@@ -209,13 +208,22 @@ export class SpotifyAuthService {
 
   private async getUserProfile({ spotify_access_token }: { spotify_access_token: string }) {
     console.log('getUserProfile');
-    const response = await axios.get(`https://api.spotify.com/v1/me`, {
+    const userProfileRes = await axios.get(`https://api.spotify.com/v1/me`, {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         Authorization: `Bearer ${spotify_access_token}`,
       },
     });
 
-    return response.data;
+    const userFollowingRes = await axios.get(`https://api.spotify.com/v1/me/following?type=artist`, {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: `Bearer ${spotify_access_token}`,
+      },
+    });
+
+    console.log('userFollowingRes: ', userFollowingRes.data);
+
+    return { ...userProfileRes.data, following: userFollowingRes.data.artists.total };
   }
 }
