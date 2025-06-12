@@ -1,7 +1,6 @@
-import { Body, Controller, Delete, Get, Logger, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Logger, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/jwt.auth.guard';
-import { TopItemOptionsDto } from './dto/top-item-options.dto';
 import { PlaylistsService } from './playlists.service';
 
 @ApiTags('Playlists')
@@ -84,10 +83,17 @@ export class PlaylistsController {
     return await this.playlistsService.removeAutoSortPlaylist({ userId: req.user.userId, playlistId });
   }
 
-  @Get('/top/:type')
-  @ApiOperation({ summary: "Récupère les top items (albums, artistes) de l'utilisateur authentifié" })
-  async getTopTrack(@Req() req, @Param('type') type: string, @Query() params: TopItemOptionsDto) {
-    this.logger.log('Received request to get Top items');
-    return await this.playlistsService.getUserTopItems({ userId: req.user.userId, type: type, options: params });
+  @Get('/top/track')
+  @ApiOperation({ summary: "Récupère les top tracks de l'utilisateur authentifié" })
+  async getUserTopTracks(@Req() req) {
+    this.logger.log('Received request to get user top tracks');
+    return await this.playlistsService.getUserTopTracks({ userId: req.user.userId });
+  }
+
+  @Get('/top/artist')
+  @ApiOperation({ summary: "Récupère les top artists de l'utilisateur authentifié" })
+  async getTopItem(@Req() req) {
+    this.logger.log('Received request to get user top artists');
+    return await this.playlistsService.getUserTopArtists({ userId: req.user.userId });
   }
 }

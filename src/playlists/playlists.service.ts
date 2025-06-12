@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
 import { PrismaService } from 'src/prisma.service';
 import { SpotifyAuthService } from 'src/spotify-auth/spotify-auth.service';
-import { TopItemOptionsDto, TypeOption } from './dto/top-item-options.dto';
 import { plainToInstance } from 'class-transformer';
 import { PlaylistItemDto } from './dto/playlist-item.dto';
 
@@ -116,8 +115,8 @@ export class PlaylistsService {
     }
   }
 
-  async getUserTopItems({ userId, type, options }: { userId: string; type: string; options: TopItemOptionsDto }) {
-    this.logger.log(`Fetching user top ${type} from Spotify`);
+  async getUserTopTracks({ userId }: { userId: string }) {
+    this.logger.log(`Fetching user top tracks from Spotify`);
 
     try {
       const existingUser = await this.prisma.user.findUnique({
@@ -134,46 +133,141 @@ export class PlaylistsService {
         throw new Error("Aucun token d'accès Spotify n'a été trouvé");
       }
 
-      const params: { time_range?: string; limit?: number; offset?: number } = {};
-      if (options.time_range) params.time_range = options.time_range;
-      if (options.limit) params.limit = options.limit;
-      if (options.offset) params.offset = options.offset;
-
-      const response = await axios.get(`https://api.spotify.com/v1/me/top/${type}`, {
+      const shortTermRes = await axios.get(`https://api.spotify.com/v1/me/top/tracks`, {
         headers: {
           Authorization: `Bearer ${spotify_access_token}`,
         },
-        params: params,
+        params: { time_range: 'short_term', limit: 30 },
       });
 
-      let topItems = [];
-      if (type == TypeOption.ARTISTS) {
-        topItems = response.data.items.map((item) => {
-          return {
-            id: item.id,
-            name: item.name,
-            description: item.description,
-            imageUrl: item.images[0]?.url || '',
-          };
-        });
-      }
+      const mediumTermRes = await axios.get(`https://api.spotify.com/v1/me/top/tracks`, {
+        headers: {
+          Authorization: `Bearer ${spotify_access_token}`,
+        },
+        params: { time_range: 'medium_term', limit: 30 },
+      });
 
-      if (type == TypeOption.TRACKS) {
-        topItems = response.data.items.map((item) => {
-          return {
-            id: item.id,
-            name: item.name,
-            artistName: item.artists[0].name,
-            albumName: item.album.name,
-            isExplicit: item.explicit,
-            imageUrl: item.album.images[0]?.url || '',
-          };
-        });
-      }
+      const longTermRes = await axios.get(`https://api.spotify.com/v1/me/top/tracks`, {
+        headers: {
+          Authorization: `Bearer ${spotify_access_token}`,
+        },
+        params: { time_range: 'long_term', limit: 30 },
+      });
 
-      return { topItems };
+      const shortTermItems = shortTermRes.data.items.map((item) => ({
+        id: item.id,
+        name: item.name,
+        artistName: item.artists[0].name,
+        albumName: item.album.name,
+        isExplicit: item.explicit,
+        imageUrl: item.album.images[0]?.url || '',
+        duration: item.duration_ms,
+      }));
+
+      const mediumTermItems = mediumTermRes.data.items.map((item) => ({
+        id: item.id,
+        name: item.name,
+        artistName: item.artists[0].name,
+        albumName: item.album.name,
+        isExplicit: item.explicit,
+        imageUrl: item.album.images[0]?.url || '',
+        duration: item.duration_ms,
+      }));
+
+      const longTermItems = longTermRes.data.items.map((item) => ({
+        id: item.id,
+        name: item.name,
+        artistName: item.artists[0].name,
+        albumName: item.album.name,
+        isExplicit: item.explicit,
+        imageUrl: item.album.images[0]?.url || '',
+        duration: item.duration_ms,
+      }));
+
+      return {
+        short_term: shortTermItems,
+        medium_term: mediumTermItems,
+        long_term: longTermItems,
+      };
     } catch (error) {
-      this.logger.error('Failed to fetch top items', error.stack);
+      this.logger.error('Failed to fetch top tracks', error.stack);
+      return {
+        error: true,
+        message: error.message,
+      };
+    }
+  }
+
+  async getUserTopArtists({ userId }: { userId: string }) {
+    this.logger.log(`Fetching user top artists from Spotify`);
+
+    try {
+      const existingUser = await this.prisma.user.findUnique({
+        where: { id: userId },
+      });
+
+      if (!existingUser) {
+        throw new Error("L'utilisateur n'existe pas");
+      }
+
+      const { spotify_access_token } = await this.spotifyAuthService.getSpotifyAccessToken({ userId: userId });
+
+      if (!spotify_access_token) {
+        throw new Error("Aucun token d'accès Spotify n'a été trouvé");
+      }
+
+      const shortTermRes = await axios.get(`https://api.spotify.com/v1/me/top/artists`, {
+        headers: {
+          Authorization: `Bearer ${spotify_access_token}`,
+        },
+        params: { time_range: 'short_term', limit: 30 },
+      });
+
+      const mediumTermRes = await axios.get(`https://api.spotify.com/v1/me/top/artists`, {
+        headers: {
+          Authorization: `Bearer ${spotify_access_token}`,
+        },
+        params: { time_range: 'medium_term', limit: 30 },
+      });
+
+      const longTermRes = await axios.get(`https://api.spotify.com/v1/me/top/artists`, {
+        headers: {
+          Authorization: `Bearer ${spotify_access_token}`,
+        },
+        params: { time_range: 'long_term', limit: 30 },
+      });
+
+      const shortTermItems = shortTermRes.data.items.map((item) => ({
+        id: item.id,
+        name: item.name,
+        description: item.description,
+        imageUrl: item.images[0]?.url || '',
+        spotifyUrl: item.external_urls.spotify,
+      }));
+
+      const mediumTermItems = mediumTermRes.data.items.map((item) => ({
+        id: item.id,
+        name: item.name,
+        description: item.description,
+        imageUrl: item.images[0]?.url || '',
+        spotifyUrl: item.external_urls.spotify,
+      }));
+
+      const longTermItems = longTermRes.data.items.map((item) => ({
+        id: item.id,
+        name: item.name,
+        description: item.description,
+        imageUrl: item.images[0]?.url || '',
+        spotifyUrl: item.external_urls.spotify,
+      }));
+
+      return {
+        short_term: shortTermItems,
+        medium_term: mediumTermItems,
+        long_term: longTermItems,
+      };
+    } catch (error) {
+      this.logger.error('Failed to fetch top artists', error.stack);
       return {
         error: true,
         message: error.message,
