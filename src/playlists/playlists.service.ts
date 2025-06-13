@@ -243,6 +243,7 @@ export class PlaylistsService {
         description: item.description,
         imageUrl: item.images[0]?.url || '',
         spotifyUrl: item.external_urls.spotify,
+        followers: item.followers.total,
       }));
 
       const mediumTermItems = mediumTermRes.data.items.map((item) => ({
@@ -251,6 +252,7 @@ export class PlaylistsService {
         description: item.description,
         imageUrl: item.images[0]?.url || '',
         spotifyUrl: item.external_urls.spotify,
+        followers: item.followers.total,
       }));
 
       const longTermItems = longTermRes.data.items.map((item) => ({
@@ -259,6 +261,7 @@ export class PlaylistsService {
         description: item.description,
         imageUrl: item.images[0]?.url || '',
         spotifyUrl: item.external_urls.spotify,
+        followers: item.followers.total,
       }));
 
       return {
