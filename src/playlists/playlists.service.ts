@@ -44,7 +44,7 @@ export class PlaylistsService {
           ownerName: item.owner.display_name,
           description: item.description,
           totalTracks: item.tracks.total || 0,
-          imageUrl: item.images[0]?.url || '',
+          imageUrl: this.extractImageUrl(item.images),
           public: item.public,
           isFavorite: existingUser.favoritePlaylists.includes(item.id),
           autoSort: existingUser.autoSortPlaylists.includes(item.id),
@@ -118,7 +118,7 @@ export class PlaylistsService {
           ownerName: response.data.owner.display_name,
           description: response.data.description,
           totalTracks: response.data.tracks.total || 0,
-          imageUrl: response.data.images[0]?.url || '',
+          imageUrl: this.extractImageUrl(response.data.images),
           public: response.data.public,
           isFavorite: existingUser.favoritePlaylists.includes(response.data.id),
           autoSort: existingUser.autoSortPlaylists.includes(response.data.id),
@@ -128,7 +128,7 @@ export class PlaylistsService {
             artistName: item.track.artists[0]?.name || '',
             albumName: item.track.album?.name || '',
             isExplicit: item.track.explicit,
-            imageUrl: item.track.album?.images[0]?.url || '',
+            imageUrl: this.extractImageUrl(item.track.album?.images),
             duration: item.track.duration_ms,
           })),
         };
@@ -188,7 +188,7 @@ export class PlaylistsService {
         artistName: item.artists[0].name,
         albumName: item.album.name,
         isExplicit: item.explicit,
-        imageUrl: item.album.images[0]?.url || '',
+        imageUrl: this.extractImageUrl(item.album.images),
         duration: item.duration_ms,
       }));
 
@@ -198,7 +198,7 @@ export class PlaylistsService {
         artistName: item.artists[0].name,
         albumName: item.album.name,
         isExplicit: item.explicit,
-        imageUrl: item.album.images[0]?.url || '',
+        imageUrl: this.extractImageUrl(item.album.images),
         duration: item.duration_ms,
       }));
 
@@ -208,7 +208,7 @@ export class PlaylistsService {
         artistName: item.artists[0].name,
         albumName: item.album.name,
         isExplicit: item.explicit,
-        imageUrl: item.album.images[0]?.url || '',
+        imageUrl: this.extractImageUrl(item.album.images),
         duration: item.duration_ms,
       }));
 
@@ -269,7 +269,7 @@ export class PlaylistsService {
         id: item.id,
         name: item.name,
         description: item.description,
-        imageUrl: item.images[0]?.url || '',
+        imageUrl: this.extractImageUrl(item.images),
         spotifyUrl: item.external_urls.spotify,
         followers: item.followers.total,
       }));
@@ -278,7 +278,7 @@ export class PlaylistsService {
         id: item.id,
         name: item.name,
         description: item.description,
-        imageUrl: item.images[0]?.url || '',
+        imageUrl: this.extractImageUrl(item.images),
         spotifyUrl: item.external_urls.spotify,
         followers: item.followers.total,
       }));
@@ -287,7 +287,7 @@ export class PlaylistsService {
         id: item.id,
         name: item.name,
         description: item.description,
-        imageUrl: item.images[0]?.url || '',
+        imageUrl: this.extractImageUrl(item.images),
         spotifyUrl: item.external_urls.spotify,
         followers: item.followers.total,
       }));
@@ -630,7 +630,7 @@ export class PlaylistsService {
         await this.deleteTracks({ tracks, playlistId, spotify_access_token });
       }
 
-      return { error: false, message: 'Playlist successfully cleaned.' };
+      return await this.getUserPlaylistById({ userId, playlistId });
     } catch (error) {
       this.logger.error('Failed to reorganize playlist', error.stack);
       return {
@@ -674,10 +674,8 @@ export class PlaylistsService {
           },
         });
 
-        return {
-          error: false,
-          message: "La playlist a bien été ajouté aux favoris de l'utilisateur.",
-        };
+        // Return the updated playlist object
+        return await this.getUserPlaylistById({ userId, playlistId });
       }
     } catch (error) {
       this.logger.error("L'ajout du favoris a échoué", error.stack);
@@ -712,7 +710,7 @@ export class PlaylistsService {
           message: "La playlist ne fait pas partie des favoris de l'utilisateur.",
         };
       } else {
-        const updatedPlaylists = existingUser.favoritePlaylists.filter((playlistId) => playlistId !== playlistId);
+        const updatedPlaylists = existingUser.favoritePlaylists.filter((favId) => favId !== playlistId);
         await this.prisma.user.update({
           where: {
             id: userId,
@@ -722,10 +720,8 @@ export class PlaylistsService {
           },
         });
 
-        return {
-          error: false,
-          message: "La playlist a bien été retirée des favoris de l'utilisateur.",
-        };
+        // Return the updated playlist object
+        return await this.getUserPlaylistById({ userId, playlistId });
       }
     } catch (error) {
       this.logger.error('La supression du favoris a échouée', error.stack);
@@ -830,5 +826,9 @@ export class PlaylistsService {
         message: error.message,
       };
     }
+  }
+
+  private extractImageUrl(images: any[]): string | null {
+    return Array.isArray(images) && images.length > 0 ? images[0].url : null;
   }
 }
