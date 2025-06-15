@@ -43,9 +43,9 @@ export class PlaylistsService {
           name: item.name,
           ownerName: item.owner.display_name,
           description: item.description,
-          imageUrl: item.images ? item.images[0]?.url : '',
+          totalTracks: item.tracks.total || 0,
+          imageUrl: item.images[0]?.url || '',
           public: item.public,
-          tracksNumber: item.tracks.total || 0,
           isFavorite: existingUser.favoritePlaylists.includes(item.id),
           autoSort: existingUser.autoSortPlaylists.includes(item.id),
         };
@@ -91,6 +91,15 @@ export class PlaylistsService {
           name: 'Titres Likés',
           description: 'Les titres que vous avez ajoutés à vos favoris sur Spotify.',
           tracks: response.data,
+          // tracks: response.data.items.map((item) => ({
+          //   id: item.track.id,
+          //   name: item.track.name,
+          //   artistName: item.track.artists[0]?.name || '',
+          //   albumName: item.track.album?.name || '',
+          //   isExplicit: item.track.explicit,
+          //   imageUrl: item.track.album?.images[0]?.url || '',
+          //   duration: item.track.duration_ms,
+          // })),
           total: response.data.total,
           uri: 'spotify:user:liked-tracks',
         };
@@ -103,7 +112,26 @@ export class PlaylistsService {
           },
         });
 
-        const playlist = response.data;
+        const playlist = {
+          id: response.data.id,
+          name: response.data.name,
+          ownerName: response.data.owner.display_name,
+          description: response.data.description,
+          totalTracks: response.data.tracks.total || 0,
+          imageUrl: response.data.images[0]?.url || '',
+          public: response.data.public,
+          isFavorite: existingUser.favoritePlaylists.includes(response.data.id),
+          autoSort: existingUser.autoSortPlaylists.includes(response.data.id),
+          tracks: response.data.tracks.items.map((item) => ({
+            id: item.track.id,
+            name: item.track.name,
+            artistName: item.track.artists[0]?.name || '',
+            albumName: item.track.album?.name || '',
+            isExplicit: item.track.explicit,
+            imageUrl: item.track.album?.images[0]?.url || '',
+            duration: item.track.duration_ms,
+          })),
+        };
         return { playlist };
       }
     } catch (error) {
