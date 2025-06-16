@@ -268,28 +268,31 @@ export class PlaylistsService {
       const shortTermItems = shortTermRes.data.items.map((item) => ({
         id: item.id,
         name: item.name,
-        description: item.description,
+        followers: item.followers.total,
+        genres: item.genres,
+        popularity: item.popularity,
         imageUrl: this.extractImageUrl(item.images),
         spotifyUrl: item.external_urls.spotify,
-        followers: item.followers.total,
       }));
 
       const mediumTermItems = mediumTermRes.data.items.map((item) => ({
         id: item.id,
         name: item.name,
-        description: item.description,
+        followers: item.followers.total,
+        genres: item.genres,
+        popularity: item.popularity,
         imageUrl: this.extractImageUrl(item.images),
         spotifyUrl: item.external_urls.spotify,
-        followers: item.followers.total,
       }));
 
       const longTermItems = longTermRes.data.items.map((item) => ({
         id: item.id,
         name: item.name,
-        description: item.description,
+        followers: item.followers.total,
+        genres: item.genres,
+        popularity: item.popularity,
         imageUrl: this.extractImageUrl(item.images),
         spotifyUrl: item.external_urls.spotify,
-        followers: item.followers.total,
       }));
 
       return {
