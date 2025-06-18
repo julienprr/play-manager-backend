@@ -8,7 +8,8 @@ async function bootstrap() {
   const host = '0.0.0.0';
 
   const app = await NestFactory.create(AppModule, {
-    logger: ['log', 'error', 'warn', 'debug', 'verbose'],
+    logger:
+      process.env.NODE_ENV === 'production' ? ['error', 'warn', 'log'] : ['error', 'warn', 'log', 'debug', 'verbose'],
   });
 
   const config = new DocumentBuilder()

@@ -45,6 +45,7 @@ export class PlaylistsService {
           description: item.description,
           totalTracks: item.tracks.total || 0,
           imageUrl: this.extractImageUrl(item.images),
+          spotifyUrl: item.external_urls.spotify,
           public: item.public,
           isFavorite: existingUser.favoritePlaylists.includes(item.id),
           autoSort: existingUser.autoSortPlaylists.includes(item.id),
@@ -119,6 +120,7 @@ export class PlaylistsService {
           description: response.data.description,
           totalTracks: response.data.tracks.total || 0,
           imageUrl: this.extractImageUrl(response.data.images),
+          spotifyUrl: response.data.external_urls.spotify,
           public: response.data.public,
           isFavorite: existingUser.favoritePlaylists.includes(response.data.id),
           autoSort: existingUser.autoSortPlaylists.includes(response.data.id),
@@ -377,7 +379,7 @@ export class PlaylistsService {
         nextUrl = playlistData.next;
       }
     }
-    console.log(`${retrievedTracks.length} tracks retrieved`);
+    this.logger.debug(`${retrievedTracks.length} tracks retrieved`);
 
     return retrievedTracks;
   }
@@ -395,11 +397,11 @@ export class PlaylistsService {
     if (playlistId == 'liked-tracks') {
       chunkSize = 50;
       const trackUrisToRemove = tracks.map((item) => item.track.id);
-      console.log(trackUrisToRemove);
+      this.logger.debug(trackUrisToRemove);
 
       for (let i = 0; i < trackUrisToRemove.length; i += chunkSize) {
         const chunk = trackUrisToRemove.slice(i, i + chunkSize);
-        console.log(`deleting tracks ${i} to ${i + chunkSize}`);
+        this.logger.debug(`deleting tracks ${i} to ${i + chunkSize}`);
 
         await axios.delete(`https://api.spotify.com/v1/me/tracks`, {
           headers: {
@@ -414,11 +416,11 @@ export class PlaylistsService {
       chunkSize = 100;
       const trackUrisToRemove = tracks.map((item) => item.track.uri);
 
-      console.log(trackUrisToRemove);
+      this.logger.debug(trackUrisToRemove);
 
       for (let i = 0; i < trackUrisToRemove.length; i += chunkSize) {
         const chunk = trackUrisToRemove.slice(i, i + chunkSize);
-        console.log(`deleting tracks ${i} to ${i + chunkSize}`);
+        this.logger.debug(`deleting tracks ${i} to ${i + chunkSize}`);
 
         await axios.delete(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
           headers: {
@@ -430,7 +432,7 @@ export class PlaylistsService {
         });
       }
     }
-    console.log('All tracks have been deleted');
+    this.logger.debug('All tracks have been deleted');
   }
 
   private async addTracks({
@@ -445,12 +447,12 @@ export class PlaylistsService {
     let chunkSize: number;
     if (playlistId == 'liked-tracks') {
       const tracksIds = tracks.map((track) => track.track.id);
-      console.log('tracks: ', tracksIds.length);
+      this.logger.debug('tracks: ' + tracksIds.length);
       chunkSize = Math.min(50, tracksIds.length);
 
       for (let i = 0; i < tracksIds.length; i += chunkSize) {
         const chunk = tracksIds.slice(i, i + chunkSize);
-        console.log(`adding tracks ${i} to ${i + chunkSize}`);
+        this.logger.debug(`adding tracks ${i} to ${i + chunkSize}`);
 
         await axios.put(
           `https://api.spotify.com/v1/me/tracks`,
@@ -462,12 +464,12 @@ export class PlaylistsService {
       }
     } else {
       const tracksUris = tracks.map((track) => track.track.uri);
-      console.log('tracks: ', tracksUris.length);
+      this.logger.debug('tracks: ' + tracksUris.length);
       chunkSize = Math.min(100, tracksUris.length);
 
       for (let i = 0; i < tracksUris.length; i += chunkSize) {
         const chunk = tracksUris.slice(i, i + chunkSize);
-        console.log(`adding tracks ${i} to ${i + chunkSize}`);
+        this.logger.debug(`adding tracks ${i} to ${i + chunkSize}`);
 
         await axios.post(
           `https://api.spotify.com/v1/playlists/${playlistId}/tracks`,
@@ -478,11 +480,11 @@ export class PlaylistsService {
         );
       }
     }
-    console.log('All tracks added successfuly');
+    this.logger.debug('All tracks added successfully');
   }
 
-  async reorganizePlaylist({ userId, playlistId }: { userId: string; playlistId: string }) {
-    this.logger.log('Reorganizing playlist', playlistId);
+  async SortPlaylistByReleaseDate({ userId, playlistId }: { userId: string; playlistId: string }) {
+    this.logger.log('Sorting playlist by release date', playlistId);
 
     try {
       const existingUser = await this.prisma.user.findUnique({
@@ -506,10 +508,10 @@ export class PlaylistsService {
         (item) => item.track && item.track.uri && item.track.id && item.track.album.id,
       );
 
-      console.log(`${validTracks.length} valid tracks to sort`);
+      this.logger.debug(`${validTracks.length} valid tracks to sort`);
       // Group and sort as needed, then update the playlist
       const sortedTracks = this.sortTracksByAlbumAndDate(validTracks);
-      console.log(`${sortedTracks.length} track sorted`);
+      this.logger.debug(`${sortedTracks.length} track sorted`);
 
       // delete all tracks
       await this.deleteTracks({ tracks: validTracks, playlistId, spotify_access_token });
@@ -517,9 +519,56 @@ export class PlaylistsService {
       // Re-add the tracks in sorted order
       await this.addTracks({ tracks: sortedTracks, playlistId, spotify_access_token });
 
-      return { error: false, message: 'Playlist successfully reorganized.' };
+      return { error: false, message: 'Playlist successfully sorted.' };
     } catch (error) {
-      this.logger.error('Failed to reorganize playlist', error.stack);
+      this.logger.error('Failed to sorting playlist', error.stack);
+      return {
+        error: true,
+        message: error.message,
+      };
+    }
+  }
+
+  async shufflePlaylist({ userId, playlistId }: { userId: string; playlistId: string }) {
+    this.logger.log(`Shuffling playlist with id ${playlistId}`);
+
+    try {
+      const existingUser = await this.prisma.user.findUnique({
+        where: { id: userId },
+      });
+
+      if (!existingUser) {
+        throw new Error("L'utilisateur n'existe pas");
+      }
+
+      const { spotify_access_token } = await this.spotifyAuthService.getSpotifyAccessToken({ userId });
+
+      if (!spotify_access_token) {
+        throw new Error("Aucun token d'accès Spotify n'a été trouvé");
+      }
+
+      // Retrieve all tracks
+      const allTracks = await this.retriveTracks({ playlistId, spotify_access_token });
+
+      const validTracks = allTracks.filter((item) => item.track && item.track.uri && item.track.id);
+
+      this.logger.debug(`${validTracks.length} valid tracks to shuffle`);
+
+      // Shuffle tracks
+      for (let i = validTracks.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [validTracks[i], validTracks[j]] = [validTracks[j], validTracks[i]];
+      }
+
+      // Delete all tracks
+      await this.deleteTracks({ tracks: validTracks, playlistId, spotify_access_token });
+
+      // Re-add the tracks in shuffled order
+      await this.addTracks({ tracks: validTracks, playlistId, spotify_access_token });
+
+      return { error: false, message: 'Playlist successfully shuffled.' };
+    } catch (error) {
+      this.logger.error('Failed to shuffle playlist', error.stack);
       return {
         error: true,
         message: error.message,
@@ -560,7 +609,7 @@ export class PlaylistsService {
         (item) => item.track && item.track.uri && item.track.id && item.track.album.id,
       );
 
-      console.log(`${validTracks.length} tracks to copy`);
+      this.logger.debug(`${validTracks.length} tracks to copy`);
 
       if (playlistDestinationId === 'new-playlist') {
         const sourcePlaylistResponse = await axios.get(`https://api.spotify.com/v1/playlists/${playlistSourceId}`, {
@@ -570,8 +619,8 @@ export class PlaylistsService {
         });
 
         const sourcePlaylist = sourcePlaylistResponse.data;
-        console.log(sourcePlaylist.name, sourcePlaylist.id);
-        console.log(existingUser.spotifyUserId);
+        this.logger.debug(`Playlist name: ${sourcePlaylist.name}, id: ${sourcePlaylist.id}`);
+        this.logger.debug(existingUser.spotifyUserId);
 
         const newPlaylistResponse = await axios.post(
           `https://api.spotify.com/v1/users/${existingUser.spotifyUserId}/playlists`,
@@ -677,7 +726,6 @@ export class PlaylistsService {
           },
         });
 
-        // Return the updated playlist object
         return await this.getUserPlaylistById({ userId, playlistId });
       }
     } catch (error) {
@@ -723,7 +771,6 @@ export class PlaylistsService {
           },
         });
 
-        // Return the updated playlist object
         return await this.getUserPlaylistById({ userId, playlistId });
       }
     } catch (error) {
