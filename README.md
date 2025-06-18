@@ -58,6 +58,25 @@ $ npm run test:e2e
 $ npm run test:cov
 ```
 
+## Authorization Code Flow
+
+Redirection de l'utilisateur vers la page d'autorisation :
+
+L'application redirige l'utilisateur vers la page d'autorisation de Spotify en utilisant l'URL d'autorisation.
+L'utilisateur se connecte à Spotify et autorise l'application à accéder à certaines informations (comme les playlists).
+Spotify redirige vers l'URI de redirection avec un code d'autorisation :
+
+Après avoir autorisé l'application, Spotify redirige l'utilisateur vers l'URI de redirection que tu as configurée, avec un code d'autorisation dans l'URL.
+Échange du code d'autorisation contre un token d'accès :
+
+Ton application serveur (Nest.js) capture ce code et envoie une requête POST à l'API de Spotify pour échanger ce code contre un token d'accès (access_token) et éventuellement un token de rafraîchissement (refresh_token).
+Utilisation du token d'accès :
+
+Le token d'accès (access_token) peut alors être utilisé pour faire des requêtes authentifiées à l'API de Spotify, par exemple pour récupérer les playlists de l'utilisateur.
+Rafraîchissement du token d'accès (facultatif) :
+
+Si le token d'accès expire, le token de rafraîchissement (refresh_token) peut être utilisé pour obtenir un nouveau token d'accès sans nécessiter que l'utilisateur se reconnecte.
+
 ## Support
 
 Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
