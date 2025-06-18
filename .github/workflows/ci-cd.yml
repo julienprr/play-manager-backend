@@ -46,7 +46,11 @@ jobs:
           ENV=$( [ "${{ github.ref }}" == "refs/heads/main" ] && echo prod || echo dev )
 
           kubectl -n $ENV create secret generic play-manager-backend-secrets \
+            --from-literal=SPOTIFY_CLIENT_ID="${{ secrets.SPOTIFY_CLIENT_ID }}" \
+            --from-literal=SPOTIFY_CLIENT_SECRET="${{ secrets.SPOTIFY_CLIENT_SECRET }}" \
+            --from-literal=SPOTIFY_REDIRECT_URI="${{ secrets.SPOTIFY_REDIRECT_URI }}" \
             --from-literal=DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+            --from-literal=JWT_SECRET="${{ secrets.JWT_SECRET }}" \
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Deploy to K8s
