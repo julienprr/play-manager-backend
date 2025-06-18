@@ -1,15 +1,15 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { Logger } from '@nestjs/common';
+import { Logger, LogLevel } from '@nestjs/common';
 
 async function bootstrap() {
   const port = parseInt(process.env.PORT ?? '8000', 10);
   const host = '0.0.0.0';
+  const levels = (process.env.LOG_LEVEL?.split(',') as LogLevel[]) || ['error', 'warn', 'log', 'debug', 'verbose'];
 
   const app = await NestFactory.create(AppModule, {
-    logger:
-      process.env.NODE_ENV === 'production' ? ['error', 'warn', 'log'] : ['error', 'warn', 'log', 'debug', 'verbose'],
+    logger: levels,
   });
 
   const config = new DocumentBuilder()
