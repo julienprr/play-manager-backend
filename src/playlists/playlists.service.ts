@@ -17,19 +17,8 @@ export class PlaylistsService {
     this.logger.log('Fetching user playlists from Spotify');
 
     try {
-      const existingUser = await this.prisma.user.findUnique({
-        where: { id: userId },
-      });
-
-      if (!existingUser) {
-        throw new Error("L'utilisateur n'existe pas");
-      }
-
-      const { spotify_access_token } = await this.spotifyAuthService.getSpotifyAccessToken({ userId: userId });
-
-      if (!spotify_access_token) {
-        throw new Error("Aucun token d'accès Spotify n'a été trouvé");
-      }
+      const { user: existingUser, accessToken: spotify_access_token } =
+        await this.validateUserAndGetAccessToken(userId);
 
       const response = await axios.get('https://api.spotify.com/v1/me/playlists', {
         headers: {
@@ -66,19 +55,8 @@ export class PlaylistsService {
 
   async getUserPlaylistById({ userId, playlistId }: { userId: string; playlistId: string }) {
     try {
-      const existingUser = await this.prisma.user.findUnique({
-        where: { id: userId },
-      });
-
-      if (!existingUser) {
-        throw new Error("L'utilisateur n'existe pas");
-      }
-
-      const { spotify_access_token } = await this.spotifyAuthService.getSpotifyAccessToken({ userId: userId });
-
-      if (!spotify_access_token) {
-        throw new Error("Aucun token d'accès Spotify n'a été trouvé");
-      }
+      const { user: existingUser, accessToken: spotify_access_token } =
+        await this.validateUserAndGetAccessToken(userId);
 
       if (playlistId === 'liked-tracks') {
         const response = await axios.get(`https://api.spotify.com/v1/me/tracks`, {
@@ -149,19 +127,7 @@ export class PlaylistsService {
     this.logger.log(`Fetching user top tracks from Spotify`);
 
     try {
-      const existingUser = await this.prisma.user.findUnique({
-        where: { id: userId },
-      });
-
-      if (!existingUser) {
-        throw new Error("L'utilisateur n'existe pas");
-      }
-
-      const { spotify_access_token } = await this.spotifyAuthService.getSpotifyAccessToken({ userId: userId });
-
-      if (!spotify_access_token) {
-        throw new Error("Aucun token d'accès Spotify n'a été trouvé");
-      }
+      const { accessToken: spotify_access_token } = await this.validateUserAndGetAccessToken(userId);
 
       const shortTermRes = await axios.get(`https://api.spotify.com/v1/me/top/tracks`, {
         headers: {
@@ -232,19 +198,7 @@ export class PlaylistsService {
     this.logger.log(`Fetching user top artists from Spotify`);
 
     try {
-      const existingUser = await this.prisma.user.findUnique({
-        where: { id: userId },
-      });
-
-      if (!existingUser) {
-        throw new Error("L'utilisateur n'existe pas");
-      }
-
-      const { spotify_access_token } = await this.spotifyAuthService.getSpotifyAccessToken({ userId: userId });
-
-      if (!spotify_access_token) {
-        throw new Error("Aucun token d'accès Spotify n'a été trouvé");
-      }
+      const { accessToken: spotify_access_token } = await this.validateUserAndGetAccessToken(userId);
 
       const shortTermRes = await axios.get(`https://api.spotify.com/v1/me/top/artists`, {
         headers: {
@@ -487,19 +441,7 @@ export class PlaylistsService {
     this.logger.log('Sorting playlist by release date', playlistId);
 
     try {
-      const existingUser = await this.prisma.user.findUnique({
-        where: { id: userId },
-      });
-
-      if (!existingUser) {
-        throw new Error("L'utilisateur n'existe pas");
-      }
-
-      const { spotify_access_token } = await this.spotifyAuthService.getSpotifyAccessToken({ userId: userId });
-
-      if (!spotify_access_token) {
-        throw new Error("Aucun token d'accès Spotify n'a été trouvé");
-      }
+      const { accessToken: spotify_access_token } = await this.validateUserAndGetAccessToken(userId);
 
       // Fetch all tracks from the playlist, handling pagination if needed
       const allTracks = await this.retriveTracks({ playlistId, spotify_access_token });
@@ -519,7 +461,7 @@ export class PlaylistsService {
       // Re-add the tracks in sorted order
       await this.addTracks({ tracks: sortedTracks, playlistId, spotify_access_token });
 
-      return { error: false, message: 'Playlist successfully sorted.' };
+      return await this.getUserPlaylistById({ userId, playlistId });
     } catch (error) {
       this.logger.error('Failed to sorting playlist', error.stack);
       return {
@@ -566,7 +508,7 @@ export class PlaylistsService {
       // Re-add the tracks in shuffled order
       await this.addTracks({ tracks: validTracks, playlistId, spotify_access_token });
 
-      return { error: false, message: 'Playlist successfully shuffled.' };
+      return await this.getUserPlaylistById({ userId, playlistId });
     } catch (error) {
       this.logger.error('Failed to shuffle playlist', error.stack);
       return {
@@ -588,19 +530,8 @@ export class PlaylistsService {
     this.logger.log(`Coping content from playlist ${playlistSourceId} to playlist ${playlistDestinationId}`);
 
     try {
-      const existingUser = await this.prisma.user.findUnique({
-        where: { id: userId },
-      });
-
-      if (!existingUser) {
-        throw new Error("L'utilisateur n'existe pas");
-      }
-
-      const { spotify_access_token } = await this.spotifyAuthService.getSpotifyAccessToken({ userId: userId });
-
-      if (!spotify_access_token) {
-        throw new Error("Aucun token d'accès Spotify n'a été trouvé");
-      }
+      const { user: existingUser, accessToken: spotify_access_token } =
+        await this.validateUserAndGetAccessToken(userId);
 
       // Fetch all tracks from the playlist, handling pagination if needed
       const sourceTracks = await this.retriveTracks({ playlistId: playlistSourceId, spotify_access_token });
@@ -661,19 +592,7 @@ export class PlaylistsService {
     this.logger.log(`Cleaning playlist with id ${playlistId}`);
 
     try {
-      const existingUser = await this.prisma.user.findUnique({
-        where: { id: userId },
-      });
-
-      if (!existingUser) {
-        throw new Error("L'utilisateur n'existe pas");
-      }
-
-      const { spotify_access_token } = await this.spotifyAuthService.getSpotifyAccessToken({ userId: userId });
-
-      if (!spotify_access_token) {
-        throw new Error("Aucun token d'accès Spotify n'a été trouvé");
-      }
+      const { accessToken: spotify_access_token } = await this.validateUserAndGetAccessToken(userId);
 
       // Fetch all tracks from the playlist, handling pagination if needed
       const tracks = await this.retriveTracks({ playlistId, spotify_access_token });
@@ -696,19 +615,7 @@ export class PlaylistsService {
     this.logger.log('Adding favorite', playlistId);
 
     try {
-      const existingUser = await this.prisma.user.findUnique({
-        where: { id: userId },
-      });
-
-      if (!existingUser) {
-        throw new Error("L'utilisateur n'existe pas");
-      }
-
-      const { spotify_access_token } = await this.spotifyAuthService.getSpotifyAccessToken({ userId: userId });
-
-      if (!spotify_access_token) {
-        throw new Error("Aucun token d'accès Spotify n'a été trouvé");
-      }
+      const { user: existingUser } = await this.validateUserAndGetAccessToken(userId);
 
       if (existingUser.favoritePlaylists.includes(playlistId)) {
         return {
@@ -741,19 +648,7 @@ export class PlaylistsService {
     this.logger.log('Removing favorite', playlistId);
 
     try {
-      const existingUser = await this.prisma.user.findUnique({
-        where: { id: userId },
-      });
-
-      if (!existingUser) {
-        throw new Error("L'utilisateur n'existe pas");
-      }
-
-      const { spotify_access_token } = await this.spotifyAuthService.getSpotifyAccessToken({ userId: userId });
-
-      if (!spotify_access_token) {
-        throw new Error("Aucun token d'accès Spotify n'a été trouvé");
-      }
+      const { user: existingUser } = await this.validateUserAndGetAccessToken(userId);
 
       if (!existingUser.favoritePlaylists.includes(playlistId)) {
         return {
@@ -786,19 +681,7 @@ export class PlaylistsService {
     this.logger.log('Adding auto sorted', playlistId);
 
     try {
-      const existingUser = await this.prisma.user.findUnique({
-        where: { id: userId },
-      });
-
-      if (!existingUser) {
-        throw new Error("L'utilisateur n'existe pas");
-      }
-
-      const { spotify_access_token } = await this.spotifyAuthService.getSpotifyAccessToken({ userId: userId });
-
-      if (!spotify_access_token) {
-        throw new Error("Aucun token d'accès Spotify n'a été trouvé");
-      }
+      const { user: existingUser } = await this.validateUserAndGetAccessToken(userId);
 
       if (existingUser.autoSortPlaylists.includes(playlistId)) {
         return {
@@ -834,19 +717,7 @@ export class PlaylistsService {
     this.logger.log('Removing auto sorted playlist', playlistId);
 
     try {
-      const existingUser = await this.prisma.user.findUnique({
-        where: { id: userId },
-      });
-
-      if (!existingUser) {
-        throw new Error("L'utilisateur n'existe pas");
-      }
-
-      const { spotify_access_token } = await this.spotifyAuthService.getSpotifyAccessToken({ userId: userId });
-
-      if (!spotify_access_token) {
-        throw new Error("Aucun token d'accès Spotify n'a été trouvé");
-      }
+      const { user: existingUser } = await this.validateUserAndGetAccessToken(userId);
 
       if (!existingUser.autoSortPlaylists.includes(playlistId)) {
         return {
@@ -880,5 +751,23 @@ export class PlaylistsService {
 
   private extractImageUrl(images: any[]): string | null {
     return Array.isArray(images) && images.length > 0 ? images[0].url : null;
+  }
+
+  private async validateUserAndGetAccessToken(userId: string): Promise<{ user: any; accessToken: string }> {
+    const existingUser = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!existingUser) {
+      throw new Error("L'utilisateur n'existe pas");
+    }
+
+    const { spotify_access_token } = await this.spotifyAuthService.getSpotifyAccessToken({ userId });
+
+    if (!spotify_access_token) {
+      throw new Error("Aucun token d'accès Spotify n'a été trouvé");
+    }
+
+    return { user: existingUser, accessToken: spotify_access_token };
   }
 }

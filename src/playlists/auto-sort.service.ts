@@ -28,7 +28,7 @@ export class AutoSortService {
         this.logger.log(`Sorting Playlist ${playlistId} de l'utilisateur ${user.id}`);
 
         try {
-          await this.playlistService.reorganizePlaylist({ userId: user.id, playlistId });
+          await this.playlistService.SortPlaylistByReleaseDate({ userId: user.id, playlistId });
           this.logger.log(`Playlist ${playlistId} triée avec succès`);
         } catch (error) {
           this.logger.error(`Erreur sur la playlist ${playlistId}: ${error.message}`);

@@ -26,11 +26,18 @@ export class PlaylistsController {
     return await this.playlistsService.getUserPlaylistById({ userId: req.user.userId, playlistId });
   }
 
-  @Post('reorganize/')
+  @Post('sort/:playlistId')
   @ApiOperation({ summary: "Trie une playlist de l'utilisateur authentifié en fonction de l'id donné" })
-  async ReorganizePlaylist(@Req() req, @Body('playlistId') playlistId: string) {
+  async ReorganizePlaylist(@Req() req, @Param('playlistId') playlistId: string) {
     this.logger.log(`Received request to reorganize playlist ${playlistId}`);
-    return await this.playlistsService.reorganizePlaylist({ userId: req.user.userId, playlistId });
+    return await this.playlistsService.SortPlaylistByReleaseDate({ userId: req.user.userId, playlistId });
+  }
+
+  @Post('shuffle/:playlistId')
+  @ApiOperation({ summary: "Mélange les titres d'une playlist de l'utilisateur" })
+  async shufflePlaylist(@Req() req, @Param('playlistId') playlistId: string) {
+    this.logger.log(`Received request to shuffle playlist ${playlistId}`);
+    return await this.playlistsService.shufflePlaylist({ userId: req.user.userId, playlistId });
   }
 
   @Post('copy/')
