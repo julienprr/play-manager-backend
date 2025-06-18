@@ -44,7 +44,6 @@ jobs:
           mkdir -p ~/.kube
           echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
           ENV=$( [ "${{ github.ref }}" == "refs/heads/main" ] && echo prod || echo dev )
-          kubectl -n $ENV set image deployment/play-manager-frontend frontend=julienprr/play-manager-frontend:${{ github.sha }}
-
+          kubectl -n $ENV set image deployment/play-manager-backend backend=julienprr/play-manager-backend:${{ github.sha }}
       - name: Check cluster context
         run: kubectl config current-context
