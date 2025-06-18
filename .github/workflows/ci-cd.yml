@@ -39,6 +39,16 @@ jobs:
         with:
           version: 'latest'
 
+      - name: Update Kubernetes Secret
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
+          ENV=$( [ "${{ github.ref }}" == "refs/heads/main" ] && echo prod || echo dev )
+
+          kubectl -n $ENV create secret generic play-manager-backend-secrets \
+            --from-literal=DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
       - name: Deploy to K8s
         run: |
           mkdir -p ~/.kube
