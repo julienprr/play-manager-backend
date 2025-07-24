@@ -1,15 +1,15 @@
+import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { Logger, LogLevel } from '@nestjs/common';
+import { AppModule } from './app.module';
+import { JsonLoggerService } from './logger/logger.service';
 
 async function bootstrap() {
   const port = parseInt(process.env.PORT ?? '8000', 10);
   const host = '0.0.0.0';
-  const levels = (process.env.LOG_LEVEL?.split(',') as LogLevel[]) || ['error', 'warn', 'log', 'debug', 'verbose'];
 
   const app = await NestFactory.create(AppModule, {
-    logger: levels,
+    bufferLogs: true,
   });
 
   const config = new DocumentBuilder()
@@ -37,6 +37,9 @@ async function bootstrap() {
     origin: process.env.CORS_ORIGIN?.split(',') || true,
     credentials: true,
   });
+
+  const logger = new JsonLoggerService();
+  app.useLogger(logger);
 
   await app.listen(port, host);
   Logger.log(`Application is running on: http://${host}:${port}`);
