@@ -1,8 +1,10 @@
+import process from 'process';
 import { ConsoleLogger, LogLevel } from '@nestjs/common';
 import os from 'os';
 
 export class JsonLoggerService extends ConsoleLogger {
   constructor(context?: string) {
+    process.env.NO_COLOR = 'true';
     const levels = (process.env.LOG_LEVEL ?? 'log,warn,error').split(',') as LogLevel[];
     super(context, { logLevels: levels });
   }
