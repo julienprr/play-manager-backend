@@ -17,7 +17,7 @@ import { LoggerModule } from './logger/logger.module';
     SpotifyAuthModule,
     PlaylistsModule,
     UserModule,
-    LoggerModule,
+    // LoggerModule,
   ],
   controllers: [],
   providers: [],

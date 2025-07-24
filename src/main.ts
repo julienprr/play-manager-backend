@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { ConsoleLogger, ConsoleLoggerOptions, Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
@@ -9,7 +9,10 @@ async function bootstrap() {
   const host = '0.0.0.0';
 
   const app = await NestFactory.create(AppModule, {
-    bufferLogs: true,
+    logger: new ConsoleLogger('App', {
+      colors: true,
+      json: false,
+    } as ConsoleLoggerOptions),
   });
 
   const config = new DocumentBuilder()
