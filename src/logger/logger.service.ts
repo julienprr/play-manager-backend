@@ -10,11 +10,12 @@ export class JsonLoggerService extends ConsoleLogger {
   private format(message: string, level: string, context?: string) {
     const hostname = process.env.HOSTNAME || (os?.hostname?.() ?? 'unknown-host');
     return JSON.stringify({
-      timestamp: new Date().toISOString(),
-      level,
-      context: context || this.context,
+      '@timestamp': new Date().toISOString(),
+      'log.level': level,
       message,
-      hostname: hostname,
+      'service.name': 'play-manager-backend',
+      'host.name': hostname,
+      ...(context ? { context } : {}),
     });
   }
 
