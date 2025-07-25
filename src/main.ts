@@ -6,7 +6,6 @@ import { JsonLoggerService } from './logger/logger.service';
 
 async function bootstrap() {
   const port = parseInt(process.env.PORT ?? '8000', 10);
-  console.log('FRONTEND_URL:', process.env.FRONTEND_URL);
   const host = '0.0.0.0';
 
   const app = await NestFactory.create(AppModule, {
@@ -14,6 +13,20 @@ async function bootstrap() {
       colors: true,
       json: false,
     } as ConsoleLoggerOptions),
+  });
+
+  const allowedOrigins = process.env.FRONTEND_URL?.split(',').map((origin) => origin.trim());
+  Logger.log(`allowedOrigins: `, allowedOrigins);
+
+  app.enableCors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`Origin ${origin} not allowed by CORS`));
+      }
+    },
+    credentials: true,
   });
 
   const config = new DocumentBuilder()
@@ -36,20 +49,6 @@ async function bootstrap() {
 
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('doc', app, document);
-
-  const allowedOrigins = process.env.FRONTEND_URL?.split(',').map((origin) => origin.trim());
-  Logger.log(`allowedOrigins: `, allowedOrigins);
-
-  app.enableCors({
-    origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error(`Origin ${origin} not allowed by CORS`));
-      }
-    },
-    credentials: true,
-  });
 
   const logger = new JsonLoggerService();
   app.useLogger(logger);
