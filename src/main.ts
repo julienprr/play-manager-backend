@@ -6,7 +6,6 @@ import { JsonLoggerService } from './logger/logger.service';
 
 async function bootstrap() {
   const port = parseInt(process.env.PORT ?? '8000', 10);
-  console.log('SPOTIFY_REDIRECT_URI:', process.env.SPOTIFY_REDIRECT_URI);
   const host = '0.0.0.0';
 
   const app = await NestFactory.create(AppModule, {
@@ -38,7 +37,7 @@ async function bootstrap() {
   SwaggerModule.setup('doc', app, document);
 
   app.enableCors({
-    origin: process.env.CORS_ORIGIN?.split(',') || true,
+    origin: process.env.FRONTEND_URL?.split(','),
     credentials: true,
   });
 
