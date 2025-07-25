@@ -7,9 +7,10 @@ import { JsonLoggerService } from './logger/logger.service';
 async function bootstrap() {
   const port = parseInt(process.env.PORT ?? '8000', 10);
   const host = '0.0.0.0';
+  const isLocal = process.env.NODE_ENV === 'local';
 
   const app = await NestFactory.create(AppModule, {
-    logger: new JsonLoggerService(),
+    logger: isLocal ? ['log', 'error', 'warn', 'debug', 'verbose'] : new JsonLoggerService(),
   });
 
   const allowedOrigins = process.env.FRONTEND_URL?.split(',').map((origin) => origin.trim());
