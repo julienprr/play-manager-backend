@@ -6,6 +6,7 @@ import { JsonLoggerService } from './logger/logger.service';
 
 async function bootstrap() {
   const port = parseInt(process.env.PORT ?? '8000', 10);
+  console.log('FRONTEND_URL:', process.env.FRONTEND_URL);
   const host = '0.0.0.0';
 
   const app = await NestFactory.create(AppModule, {
