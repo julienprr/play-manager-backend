@@ -1,4 +1,4 @@
-import { ConsoleLogger, ConsoleLoggerOptions, Logger } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
@@ -9,14 +9,10 @@ async function bootstrap() {
   const host = '0.0.0.0';
 
   const app = await NestFactory.create(AppModule, {
-    logger: new ConsoleLogger('App', {
-      colors: true,
-      json: false,
-    } as ConsoleLoggerOptions),
+    logger: new JsonLoggerService(),
   });
 
   const allowedOrigins = process.env.FRONTEND_URL?.split(',').map((origin) => origin.trim());
-  Logger.log(`allowedOrigins: `, allowedOrigins);
 
   app.enableCors({
     origin: (origin, callback) => {
@@ -49,9 +45,6 @@ async function bootstrap() {
 
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('doc', app, document);
-
-  const logger = new JsonLoggerService();
-  app.useLogger(logger);
 
   await app.listen(port, host);
   Logger.log(`Application is running on: http://${host}:${port}`);

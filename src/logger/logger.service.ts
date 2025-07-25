@@ -4,7 +4,7 @@ import os from 'os';
 export class JsonLoggerService extends ConsoleLogger {
   constructor(context?: string) {
     const levels = (process.env.LOG_LEVEL ?? 'log,warn,error').split(',') as LogLevel[];
-    super(context, { logLevels: levels, colors: false } as any);
+    super(context, { logLevels: levels });
   }
 
   private format(message: string, level: string, context?: string) {
