@@ -37,8 +37,17 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('doc', app, document);
 
+  const allowedOrigins = process.env.FRONTEND_URL?.split(',').map((origin) => origin.trim());
+  Logger.log(`allowedOrigins: `, allowedOrigins);
+
   app.enableCors({
-    origin: process.env.FRONTEND_URL?.split(','),
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`Origin ${origin} not allowed by CORS`));
+      }
+    },
     credentials: true,
   });
 
