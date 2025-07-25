@@ -1,15 +1,29 @@
+import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { Logger, LogLevel } from '@nestjs/common';
+import { AppModule } from './app.module';
+import { JsonLoggerService } from './logger/logger.service';
 
 async function bootstrap() {
   const port = parseInt(process.env.PORT ?? '8000', 10);
   const host = '0.0.0.0';
-  const levels = (process.env.LOG_LEVEL?.split(',') as LogLevel[]) || ['error', 'warn', 'log', 'debug', 'verbose'];
+  const isLocal = process.env.NODE_ENV === 'local';
 
   const app = await NestFactory.create(AppModule, {
-    logger: levels,
+    logger: isLocal ? ['log', 'error', 'warn', 'debug', 'verbose'] : new JsonLoggerService(),
+  });
+
+  const allowedOrigins = process.env.FRONTEND_URL?.split(',').map((origin) => origin.trim());
+
+  app.enableCors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`Origin ${origin} not allowed by CORS`));
+      }
+    },
+    credentials: true,
   });
 
   const config = new DocumentBuilder()
@@ -32,11 +46,6 @@ async function bootstrap() {
 
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('doc', app, document);
-
-  app.enableCors({
-    origin: process.env.CORS_ORIGIN?.split(',') || true,
-    credentials: true,
-  });
 
   await app.listen(port, host);
   Logger.log(`Application is running on: http://${host}:${port}`);
