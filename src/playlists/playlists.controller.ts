@@ -62,9 +62,9 @@ export class PlaylistsController {
     return await this.playlistsService.cleanPlaylist({ userId: req.user.userId, playlistId });
   }
 
-  @Post('favorites/')
+  @Post('favorites/:playlistId')
   @ApiOperation({ summary: "Ajoute l'id de la playlist aux favoris de l'utilisateur" })
-  async addFavorite(@Req() req, @Body('playlistId') playlistId: string) {
+  async addFavorite(@Req() req, @Param('playlistId') playlistId: string) {
     this.logger.log(`Received request to add playlist ${playlistId} to favorites`);
     return await this.playlistsService.addFavoritePlaylist({ userId: req.user.userId, playlistId });
   }
@@ -76,9 +76,9 @@ export class PlaylistsController {
     return await this.playlistsService.removeFavoritePlaylist({ userId: req.user.userId, playlistId });
   }
 
-  @Post('auto-sort/')
+  @Post('auto-sort/:playlistId')
   @ApiOperation({ summary: "Ajoute l'id de la playlist aux playlists auto sorted de l'utilisateur" })
-  async addAutoSort(@Req() req, @Body('playlistId') playlistId: string) {
+  async addAutoSort(@Req() req, @Param('playlistId') playlistId: string) {
     this.logger.log(`Received request to add playlist ${playlistId} to auto sorted`);
     return await this.playlistsService.addAutoSortPlaylist({ userId: req.user.userId, playlistId });
   }

@@ -1,9 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { User } from '@prisma/client';
 import axios from 'axios';
+import { plainToInstance } from 'class-transformer';
+import { ApiResponse } from 'src/common/types/api-response.type';
 import { PrismaService } from 'src/prisma.service';
 import { SpotifyAuthService } from 'src/spotify-auth/spotify-auth.service';
-import { plainToInstance } from 'class-transformer';
 import { PlaylistItemDto } from './dto/playlist-item.dto';
+import { PlaylistListResponse, PlaylistResponse } from './types/playlist-response.type';
 
 @Injectable()
 export class PlaylistsService {
@@ -13,7 +16,7 @@ export class PlaylistsService {
     private readonly spotifyAuthService: SpotifyAuthService,
   ) {}
 
-  async getUserPlaylists({ userId }: { userId: string }) {
+  async getUserPlaylists({ userId }: { userId: string }): Promise<PlaylistListResponse> {
     this.logger.log('Fetching user playlists from Spotify');
 
     try {
@@ -41,9 +44,9 @@ export class PlaylistsService {
         };
       });
 
-      const playlists = plainToInstance(PlaylistItemDto, playlistsData);
+      // const playlists = plainToInstance(PlaylistItemDto, playlistsData);
 
-      return { playlists };
+      return { error: false, playlists: playlistsData };
     } catch (error) {
       this.logger.error('Failed to fetch playlists', error.stack);
       return {
@@ -53,7 +56,7 @@ export class PlaylistsService {
     }
   }
 
-  async getUserPlaylistById({ userId, playlistId }: { userId: string; playlistId: string }) {
+  async getUserPlaylistById({ userId, playlistId }: { userId: string; playlistId: string }): Promise<PlaylistResponse> {
     try {
       const { user: existingUser, accessToken: spotify_access_token } =
         await this.validateUserAndGetAccessToken(userId);
@@ -70,6 +73,7 @@ export class PlaylistsService {
           name: 'Titres Likés',
           description: 'Les titres que vous avez ajoutés à vos favoris sur Spotify.',
           tracks: response.data,
+          ownerName: existingUser.username,
           // tracks: response.data.items.map((item) => ({
           //   id: item.track.id,
           //   name: item.track.name,
@@ -81,9 +85,20 @@ export class PlaylistsService {
           // })),
           total: response.data.total,
           uri: 'spotify:user:liked-tracks',
+          totalTracks: response.data.total || 0,
+          imageUrl: '',
+          spotifyUrl: '',
+          public: '',
+          isFavorite: existingUser.favoritePlaylists.includes(response.data.id),
+          autoSort: existingUser.autoSortPlaylists.includes(response.data.id),
         };
 
-        return { playlist: likedTracksPlaylist };
+        const playlist = plainToInstance(PlaylistItemDto, likedTracksPlaylist);
+
+        return {
+          error: false,
+          playlist: playlist,
+        };
       } else {
         const response = await axios.get(`https://api.spotify.com/v1/playlists/${playlistId}`, {
           headers: {
@@ -91,7 +106,7 @@ export class PlaylistsService {
           },
         });
 
-        const playlist = {
+        const item = {
           id: response.data.id,
           name: response.data.name,
           ownerName: response.data.owner.display_name,
@@ -112,7 +127,10 @@ export class PlaylistsService {
             duration: item.track.duration_ms,
           })),
         };
-        return { playlist };
+
+        const playlist = plainToInstance(PlaylistItemDto, item);
+
+        return { error: false, playlist: playlist };
       }
     } catch (error) {
       this.logger.error('Failed to fetch playlists', error.stack);
@@ -265,7 +283,7 @@ export class PlaylistsService {
     }
   }
 
-  private sortTracksByAlbumAndDate(tracks: any[]) {
+  private sortTracksByReleaseDate(tracks: any[]) {
     const albumsMap = new Map<string, { albumName: string; releaseDate: string; tracks: any[] }>();
 
     tracks.forEach((track) => {
@@ -437,7 +455,13 @@ export class PlaylistsService {
     this.logger.debug('All tracks added successfully');
   }
 
-  async SortPlaylistByReleaseDate({ userId, playlistId }: { userId: string; playlistId: string }) {
+  async SortPlaylistByReleaseDate({
+    userId,
+    playlistId,
+  }: {
+    userId: string;
+    playlistId: string;
+  }): Promise<PlaylistResponse> {
     this.logger.log('Sorting playlist by release date', playlistId);
 
     try {
@@ -452,7 +476,7 @@ export class PlaylistsService {
 
       this.logger.debug(`${validTracks.length} valid tracks to sort`);
       // Group and sort as needed, then update the playlist
-      const sortedTracks = this.sortTracksByAlbumAndDate(validTracks);
+      const sortedTracks = this.sortTracksByReleaseDate(validTracks);
       this.logger.debug(`${sortedTracks.length} track sorted`);
 
       // delete all tracks
@@ -471,7 +495,7 @@ export class PlaylistsService {
     }
   }
 
-  async shufflePlaylist({ userId, playlistId }: { userId: string; playlistId: string }) {
+  async shufflePlaylist({ userId, playlistId }: { userId: string; playlistId: string }): Promise<PlaylistResponse> {
     this.logger.log(`Shuffling playlist with id ${playlistId}`);
 
     try {
@@ -526,14 +550,13 @@ export class PlaylistsService {
     userId: string;
     playlistSourceId: string;
     playlistDestinationId: string;
-  }) {
+  }): Promise<PlaylistResponse> {
     this.logger.log(`Coping content from playlist ${playlistSourceId} to playlist ${playlistDestinationId}`);
 
     try {
       const { user: existingUser, accessToken: spotify_access_token } =
         await this.validateUserAndGetAccessToken(userId);
 
-      // Fetch all tracks from the playlist, handling pagination if needed
       const sourceTracks = await this.retriveTracks({ playlistId: playlistSourceId, spotify_access_token });
 
       const validTracks = sourceTracks.filter(
@@ -578,9 +601,9 @@ export class PlaylistsService {
       await this.addTracks({ tracks: validTracks, playlistId: playlistDestinationId, spotify_access_token });
 
       this.logger.log('The playlist has been copied succesfully');
-      return { error: false, message: 'Playlist successfully copied.' };
+      return await this.getUserPlaylistById({ userId, playlistId: playlistDestinationId });
     } catch (error) {
-      this.logger.error('Failed to copie playlist', error.stack);
+      this.logger.error('Failed to copy playlist', error.stack);
       return {
         error: true,
         message: error.message,
@@ -588,13 +611,11 @@ export class PlaylistsService {
     }
   }
 
-  async cleanPlaylist({ userId, playlistId }: { userId: string; playlistId: string }) {
+  async cleanPlaylist({ userId, playlistId }: { userId: string; playlistId: string }): Promise<PlaylistResponse> {
     this.logger.log(`Cleaning playlist with id ${playlistId}`);
 
     try {
       const { accessToken: spotify_access_token } = await this.validateUserAndGetAccessToken(userId);
-
-      // Fetch all tracks from the playlist, handling pagination if needed
       const tracks = await this.retriveTracks({ playlistId, spotify_access_token });
 
       if (tracks.length > 0) {
@@ -611,7 +632,13 @@ export class PlaylistsService {
     }
   }
 
-  async addFavoritePlaylist({ userId, playlistId }: { userId: string; playlistId: string }) {
+  async addFavoritePlaylist({
+    userId,
+    playlistId,
+  }: {
+    userId: string;
+    playlistId: string;
+  }): Promise<ApiResponse<'favoritePlaylists', string[]>> {
     this.logger.log('Adding favorite', playlistId);
 
     try {
@@ -622,19 +649,22 @@ export class PlaylistsService {
           error: true,
           message: "La playlist fait déjà partie des favoris de l'utilisateur.",
         };
-      } else {
-        const updatedFavorite = existingUser.favoritePlaylists.concat(playlistId);
-        await this.prisma.user.update({
-          where: {
-            id: userId,
-          },
-          data: {
-            favoritePlaylists: updatedFavorite,
-          },
-        });
-
-        return await this.getUserPlaylistById({ userId, playlistId });
       }
+
+      const updatedFavoritePlaylists = existingUser.favoritePlaylists.concat(playlistId);
+      await this.prisma.user.update({
+        where: {
+          id: userId,
+        },
+        data: {
+          favoritePlaylists: updatedFavoritePlaylists,
+        },
+      });
+
+      return {
+        error: false,
+        favoritePlaylists: updatedFavoritePlaylists,
+      };
     } catch (error) {
       this.logger.error("L'ajout du favoris a échoué", error.stack);
       return {
@@ -644,7 +674,13 @@ export class PlaylistsService {
     }
   }
 
-  async removeFavoritePlaylist({ userId, playlistId }: { userId: string; playlistId: string }) {
+  async removeFavoritePlaylist({
+    userId,
+    playlistId,
+  }: {
+    userId: string;
+    playlistId: string;
+  }): Promise<ApiResponse<'favoritePlaylists', string[]>> {
     this.logger.log('Removing favorite', playlistId);
 
     try {
@@ -656,17 +692,22 @@ export class PlaylistsService {
           message: "La playlist ne fait pas partie des favoris de l'utilisateur.",
         };
       } else {
-        const updatedPlaylists = existingUser.favoritePlaylists.filter((favId) => favId !== playlistId);
+        const updatedFavoritePlaylists: string[] = existingUser.favoritePlaylists.filter(
+          (favId) => favId !== playlistId,
+        );
         await this.prisma.user.update({
           where: {
             id: userId,
           },
           data: {
-            favoritePlaylists: updatedPlaylists,
+            favoritePlaylists: updatedFavoritePlaylists,
           },
         });
 
-        return await this.getUserPlaylistById({ userId, playlistId });
+        return {
+          error: false,
+          favoritePlaylists: updatedFavoritePlaylists,
+        };
       }
     } catch (error) {
       this.logger.error('La supression du favoris a échouée', error.stack);
@@ -677,8 +718,14 @@ export class PlaylistsService {
     }
   }
 
-  async addAutoSortPlaylist({ userId, playlistId }: { userId: string; playlistId: string }) {
-    this.logger.log('Adding auto sorted', playlistId);
+  async addAutoSortPlaylist({
+    userId,
+    playlistId,
+  }: {
+    userId: string;
+    playlistId: string;
+  }): Promise<ApiResponse<'autoSortPlaylists', string[]>> {
+    this.logger.log('Adding auto sort playlist', playlistId);
 
     try {
       const { user: existingUser } = await this.validateUserAndGetAccessToken(userId);
@@ -689,19 +736,19 @@ export class PlaylistsService {
           message: 'La playlist est déjà en auto sorted.',
         };
       } else {
-        const updatedAutoSort = existingUser.autoSortPlaylists.concat(playlistId);
+        const updatedAutoSortPlaylists = existingUser.autoSortPlaylists.concat(playlistId);
         await this.prisma.user.update({
           where: {
             id: userId,
           },
           data: {
-            autoSortPlaylists: updatedAutoSort,
+            autoSortPlaylists: updatedAutoSortPlaylists,
           },
         });
 
         return {
           error: false,
-          message: "La playlist a bien été ajouté aux playlists auto sorted de l'utilisateur.",
+          autoSortPlaylists: updatedAutoSortPlaylists,
         };
       }
     } catch (error) {
@@ -713,8 +760,14 @@ export class PlaylistsService {
     }
   }
 
-  async removeAutoSortPlaylist({ userId, playlistId }: { userId: string; playlistId: string }) {
-    this.logger.log('Removing auto sorted playlist', playlistId);
+  async removeAutoSortPlaylist({
+    userId,
+    playlistId,
+  }: {
+    userId: string;
+    playlistId: string;
+  }): Promise<ApiResponse<'autoSortPlaylists', string[]>> {
+    this.logger.log('Removing auto sort playlist', playlistId);
 
     try {
       const { user: existingUser } = await this.validateUserAndGetAccessToken(userId);
@@ -722,22 +775,24 @@ export class PlaylistsService {
       if (!existingUser.autoSortPlaylists.includes(playlistId)) {
         return {
           error: true,
-          message: "La playlist ne fait pas partie des playlists auto sorted de l'utilisateur.",
+          message: "La playlist ne fait pas partie des playlists auto sort de l'utilisateur.",
         };
       } else {
-        const updatedPlaylists = existingUser.autoSortPlaylists.filter((playlistId) => playlistId !== playlistId);
+        const updatedAutoSortPlaylists = existingUser.autoSortPlaylists.filter(
+          (playlistId: string) => playlistId !== playlistId,
+        );
         await this.prisma.user.update({
           where: {
             id: userId,
           },
           data: {
-            autoSortPlaylists: updatedPlaylists,
+            autoSortPlaylists: updatedAutoSortPlaylists,
           },
         });
 
         return {
           error: false,
-          message: "La playlist a bien été retirée des playlists auto sorted de l'utilisateur.",
+          autoSortPlaylists: updatedAutoSortPlaylists,
         };
       }
     } catch (error) {
@@ -753,7 +808,7 @@ export class PlaylistsService {
     return Array.isArray(images) && images.length > 0 ? images[0].url : null;
   }
 
-  private async validateUserAndGetAccessToken(userId: string): Promise<{ user: any; accessToken: string }> {
+  private async validateUserAndGetAccessToken(userId: string): Promise<{ user: User; accessToken: string }> {
     const existingUser = await this.prisma.user.findUnique({
       where: { id: userId },
     });
