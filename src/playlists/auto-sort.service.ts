@@ -15,6 +15,11 @@ export class AutoSortService {
   @Cron(CronExpression.EVERY_DAY_AT_NOON) async handleAutoSort() {
     this.logger.log('Début du cron autoSort');
 
+    if (process.env.NODE_ENV !== 'production') {
+      this.logger.debug('Auto sort skipped: not in production environment');
+      return;
+    }
+
     const users = await this.prisma.user.findMany({
       where: {
         autoSortPlaylists: {
