@@ -1,4 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { AuthService } from 'src/auth/auth.service';
@@ -27,6 +34,7 @@ export class SpotifyAuthService {
     const scopes = [
       'user-read-email',
       'user-top-read',
+      'user-read-private',
       'playlist-read-private',
       'playlist-modify-private',
       'playlist-modify-public',
@@ -43,13 +51,12 @@ export class SpotifyAuthService {
 
   async getTokensFromSpotify(code: string) {
     this.logger.log('Requesting Spotify access token with code: ', code);
-    this.logger.log('Redirect Uri: ', this.redirectUri);
 
     try {
       const response = await axios.post('https://accounts.spotify.com/api/token', null, {
         params: {
           grant_type: 'authorization_code',
-          code: code,
+          code,
           redirect_uri: this.redirectUri,
           client_id: this.clientId,
           client_secret: this.clientSecret,
@@ -59,13 +66,16 @@ export class SpotifyAuthService {
         },
       });
 
-      console.log('response', response.data);
-
       const { access_token, refresh_token } = response.data;
+
+      if (!access_token) {
+        throw new InternalServerErrorException('Access token non reçu depuis Spotify');
+      }
+
       return { spotify_access_token: access_token, spotify_refresh_token: refresh_token };
     } catch (error) {
-      this.logger.error('Failed to retrieve Spotify token', error.message);
-      throw error;
+      this.logger.error('Erreur lors de la récupération du token Spotify', error.message);
+      throw new BadRequestException('Impossible d’obtenir un token Spotify. Veuillez réessayer.');
     }
   }
 
@@ -78,44 +88,27 @@ export class SpotifyAuthService {
    * @returns le token d'accès
    */
   async authenticate(code: string) {
-    try {
-      if (!code) {
-        throw new Error("Aucun code n'a été récupéré");
-      }
+    if (!code) {
+      throw new BadRequestException("Aucun code n'a été récupéré");
+    }
 
-      const { spotify_access_token, spotify_refresh_token } = await this.getTokensFromSpotify(code);
+    const { spotify_access_token, spotify_refresh_token } = await this.getTokensFromSpotify(code);
 
-      if (!spotify_access_token) {
-        throw new Error("Aucun token n'a été récupéré");
-      }
+    if (!spotify_access_token) {
+      throw new UnauthorizedException("Aucun token n'a été récupéré");
+    }
 
-      const userProfile = await this.getUserProfile({ spotify_access_token });
-      const existingUser = await this.prisma.user.findUnique({
-        where: {
-          spotifyUserId: userProfile.id,
-        },
-      });
+    const userProfile = await this.getUserProfile({ spotify_access_token });
+    console.log('userProfile: ', userProfile);
 
-      if (!existingUser) {
-        const createdUser = await this.prisma.user.create({
-          data: {
-            spotifyUserId: userProfile.id,
-            email: userProfile.email,
-            username: userProfile.display_name,
-            spotifyAccessToken: spotify_access_token,
-            spotifyAccessTokenTimestamp: new Date(),
-            spotifyRefreshToken: spotify_refresh_token,
-          },
-        });
+    const existingUser = await this.prisma.user.findUnique({
+      where: {
+        spotifyUserId: userProfile.id,
+      },
+    });
 
-        this.logger.log(`New user created with email ${createdUser.email}`);
-        return await this.authService.authenticateUser({ userId: createdUser.id });
-      }
-
-      const updatedUser = await this.prisma.user.update({
-        where: {
-          id: existingUser.id,
-        },
+    if (!existingUser) {
+      const createdUser = await this.prisma.user.create({
         data: {
           spotifyUserId: userProfile.id,
           email: userProfile.email,
@@ -126,38 +119,46 @@ export class SpotifyAuthService {
         },
       });
 
-      const access_token = await this.authService.authenticateUser({ userId: updatedUser.id });
+      this.logger.log(`New user created with email ${createdUser.email}`);
+      const access_token = await this.authService.authenticateUser({ userId: createdUser.id });
+
       return { user: userProfile, ...access_token };
-    } catch (error) {
-      this.logger.error(error);
-      return { error: true, message: error.message, token: '' };
     }
+
+    const updatedUser = await this.prisma.user.update({
+      where: {
+        id: existingUser.id,
+      },
+      data: {
+        spotifyUserId: userProfile.id,
+        email: userProfile.email,
+        username: userProfile.display_name,
+        spotifyAccessToken: spotify_access_token,
+        spotifyAccessTokenTimestamp: new Date(),
+        spotifyRefreshToken: spotify_refresh_token,
+      },
+    });
+
+    const access_token = await this.authService.authenticateUser({ userId: updatedUser.id });
+    return { user: userProfile, ...access_token };
   }
 
   async getSpotifyAccessToken({ userId }: { userId: string }) {
     this.logger.log('getSpotifyAccessToken');
-    try {
-      const user = await this.prisma.user.findUnique({ where: { id: userId } });
-      if (!user) {
-        throw new Error("L'utilisateur n'éxiste pas");
-      }
-
-      const currentTime = new Date();
-      const expirationDate = new Date(user.spotifyAccessTokenTimestamp.getTime() + 3600000);
-
-      if (expirationDate && currentTime < expirationDate) {
-        return { spotify_access_token: user.spotifyAccessToken };
-      }
-
-      // Si le token est expiré, rafraîchir
-      return await this.refreshSpotifyToken(userId);
-    } catch (error) {
-      console.error(error);
-      return {
-        error: true,
-        message: error.message,
-      };
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException("L'utilisateur n'existe pas");
     }
+
+    const currentTime = new Date();
+    const expirationDate = new Date(user.spotifyAccessTokenTimestamp.getTime() + 3600000);
+
+    if (expirationDate && currentTime < expirationDate) {
+      return { spotify_access_token: user.spotifyAccessToken };
+    }
+
+    // Si le token est expiré, rafraîchir
+    return await this.refreshSpotifyToken(userId);
   }
 
   async refreshSpotifyToken(userId: string) {
@@ -167,12 +168,12 @@ export class SpotifyAuthService {
     });
 
     if (!existingUser) {
-      throw new Error("L'utilisateur n'éxiste pas");
+      throw new NotFoundException("L'utilisateur n'existe pas");
     }
 
     if (!existingUser.spotifyRefreshToken) {
       this.logger.error("Aucun token de rafraichissement n'a été touvé");
-      throw new Error('REAUTHENTIFICATION_REQUIRED');
+      throw new UnauthorizedException('REAUTHENTIFICATION_REQUIRED');
     }
 
     try {
@@ -202,28 +203,35 @@ export class SpotifyAuthService {
       return { spotify_access_token: access_token };
     } catch (error) {
       this.logger.error('Failed to refresh Spotify token', error);
-      return { error: true, message: error.message };
+      throw new InternalServerErrorException(error.message);
     }
   }
 
   private async getUserProfile({ spotify_access_token }: { spotify_access_token: string }) {
-    console.log('getUserProfile');
-    const userProfileRes = await axios.get(`https://api.spotify.com/v1/me`, {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        Authorization: `Bearer ${spotify_access_token}`,
-      },
-    });
+    console.log('get user profile');
+    try {
+      const userProfileRes = await axios.get(`https://api.spotify.com/v1/me`, {
+        headers: {
+          Authorization: `Bearer ${spotify_access_token}`,
+        },
+      });
 
-    const userFollowingRes = await axios.get(`https://api.spotify.com/v1/me/following?type=artist`, {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        Authorization: `Bearer ${spotify_access_token}`,
-      },
-    });
+      console.log('userProfileRes ', userProfileRes.data);
 
-    console.log('userFollowingRes: ', userFollowingRes.data);
+      let followingTotal = null;
 
-    return { ...userProfileRes.data, following: userFollowingRes.data.artists.total };
+      const userFollowingRes = await axios.get(`https://api.spotify.com/v1/me/following?type=artist`, {
+        headers: {
+          Authorization: `Bearer ${spotify_access_token}`,
+        },
+      });
+      followingTotal = userFollowingRes.data.artists.total;
+      console.log('userFollowingRes ', userFollowingRes.data);
+
+      return { ...userProfileRes.data, following: followingTotal };
+    } catch (error) {
+      this.logger.error(error.message);
+      throw new UnauthorizedException('Impossible de récupérer le profil utilisateur Spotify');
+    }
   }
 }
