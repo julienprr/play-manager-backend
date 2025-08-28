@@ -59,7 +59,7 @@ export class PlaylistsController {
   @ApiOperation({ summary: "Vide une playlist de l'utilisateur authentifié en fonction de l'id donné" })
   async cleanPlaylist(@Req() req, @Param('playlistId') playlistId: string) {
     this.logger.log(`Received request to clean playlist ${playlistId}`);
-    return await this.playlistsService.cleanPlaylist({ userId: req.user.userId, playlistId });
+    return await this.playlistsService.clearPlaylist({ userId: req.user.userId, playlistId });
   }
 
   @Post('favorites/:playlistId')

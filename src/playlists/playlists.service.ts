@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { User } from '@prisma/client';
 import axios from 'axios';
 import { plainToInstance } from 'class-transformer';
@@ -29,6 +29,12 @@ export class PlaylistsService {
         },
       });
 
+      const savedTracksResponse = await axios.get('https://api.spotify.com/v1/me/tracks', {
+        headers: {
+          Authorization: `Bearer ${spotify_access_token}`,
+        },
+      });
+
       const playlistsData = response.data.items.map((item: any) => {
         return {
           id: item.id,
@@ -44,15 +50,23 @@ export class PlaylistsService {
         };
       });
 
-      // const playlists = plainToInstance(PlaylistItemDto, playlistsData);
+      playlistsData.push({
+        id: 'liked-songs',
+        name: 'Liked Songs',
+        ownerName: existingUser.username,
+        description: 'Your liked songs on Spotify',
+        totalTracks: savedTracksResponse.data.total || 0,
+        imageUrl: null,
+        spotifyUrl: '',
+        public: false,
+        isFavorite: existingUser.favoritePlaylists.includes('liked-songs'),
+        autoSort: existingUser.autoSortPlaylists.includes('liked-songs'),
+      });
 
-      return { error: false, playlists: playlistsData };
+      return { playlists: playlistsData };
     } catch (error) {
       this.logger.error('Failed to fetch playlists', error.stack);
-      return {
-        error: true,
-        message: error.message,
-      };
+      throw new HttpException('Failed to fetch playlists: ' + error.message, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -61,7 +75,7 @@ export class PlaylistsService {
       const { user: existingUser, accessToken: spotify_access_token } =
         await this.validateUserAndGetAccessToken(userId);
 
-      if (playlistId === 'liked-tracks') {
+      if (playlistId === 'liked-songs') {
         const response = await axios.get(`https://api.spotify.com/v1/me/tracks`, {
           headers: {
             Authorization: `Bearer ${spotify_access_token}`,
@@ -69,36 +83,31 @@ export class PlaylistsService {
         });
 
         const likedTracksPlaylist = {
-          id: 'liked-tracks',
-          name: 'Titres Likés',
-          description: 'Les titres que vous avez ajoutés à vos favoris sur Spotify.',
-          tracks: response.data,
+          id: 'liked-songs',
+          name: 'Liked Songs',
+          description: 'Your liked songs on Spotify',
           ownerName: existingUser.username,
-          // tracks: response.data.items.map((item) => ({
-          //   id: item.track.id,
-          //   name: item.track.name,
-          //   artistName: item.track.artists[0]?.name || '',
-          //   albumName: item.track.album?.name || '',
-          //   isExplicit: item.track.explicit,
-          //   imageUrl: item.track.album?.images[0]?.url || '',
-          //   duration: item.track.duration_ms,
-          // })),
-          total: response.data.total,
-          uri: 'spotify:user:liked-tracks',
+          tracks: response.data.items.map((item) => ({
+            id: item.track.id,
+            name: item.track.name,
+            artistName: item.track.artists[0]?.name || '',
+            albumName: item.track.album?.name || '',
+            isExplicit: item.track.explicit,
+            imageUrl: item.track.album?.images[0]?.url || '',
+            duration: item.track.duration_ms,
+          })),
+          uri: '',
           totalTracks: response.data.total || 0,
-          imageUrl: '',
+          imageUrl: null,
           spotifyUrl: '',
-          public: '',
-          isFavorite: existingUser.favoritePlaylists.includes(response.data.id),
-          autoSort: existingUser.autoSortPlaylists.includes(response.data.id),
+          public: false,
+          isFavorite: existingUser.favoritePlaylists.includes('liked-songs'),
+          autoSort: existingUser.autoSortPlaylists.includes('liked-songs'),
         };
 
         const playlist = plainToInstance(PlaylistItemDto, likedTracksPlaylist);
 
-        return {
-          error: false,
-          playlist: playlist,
-        };
+        return { playlist };
       } else {
         const response = await axios.get(`https://api.spotify.com/v1/playlists/${playlistId}`, {
           headers: {
@@ -130,14 +139,11 @@ export class PlaylistsService {
 
         const playlist = plainToInstance(PlaylistItemDto, item);
 
-        return { error: false, playlist: playlist };
+        return { playlist };
       }
     } catch (error) {
       this.logger.error('Failed to fetch playlists', error.stack);
-      return {
-        error: true,
-        message: error.message,
-      };
+      throw new HttpException('Failed to fetch playlists: ' + error.message, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -205,10 +211,7 @@ export class PlaylistsService {
       };
     } catch (error) {
       this.logger.error('Failed to fetch top tracks', error.stack);
-      return {
-        error: true,
-        message: error.message,
-      };
+      throw new HttpException('Failed to fetch top tracks: ' + error.message, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -276,10 +279,7 @@ export class PlaylistsService {
       };
     } catch (error) {
       this.logger.error('Failed to fetch top artists', error.stack);
-      return {
-        error: true,
-        message: error.message,
-      };
+      throw new HttpException('Failed to fetch top artists: ' + error.message, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -322,7 +322,7 @@ export class PlaylistsService {
   }) {
     let retrievedTracks: any[] = [];
 
-    if (playlistId == 'liked-tracks') {
+    if (playlistId == 'liked-songs') {
       let nextUrl = `https://api.spotify.com/v1/me/tracks?limit=50`;
 
       while (nextUrl) {
@@ -366,7 +366,7 @@ export class PlaylistsService {
     spotify_access_token: string;
   }) {
     let chunkSize: number;
-    if (playlistId == 'liked-tracks') {
+    if (playlistId == 'liked-songs') {
       chunkSize = 50;
       const trackUrisToRemove = tracks.map((item) => item.track.id);
       this.logger.debug(trackUrisToRemove);
@@ -417,19 +417,19 @@ export class PlaylistsService {
     spotify_access_token: string;
   }) {
     let chunkSize: number;
-    if (playlistId == 'liked-tracks') {
+    if (playlistId == 'liked-songs') {
       const tracksIds = tracks.map((track) => track.track.id);
       this.logger.debug('tracks: ' + tracksIds.length);
-      chunkSize = Math.min(50, tracksIds.length);
 
-      for (let i = 0; i < tracksIds.length; i += chunkSize) {
-        const chunk = tracksIds.slice(i, i + chunkSize);
-        this.logger.debug(`adding tracks ${i} to ${i + chunkSize}`);
+      // Ajouter les titres un par un dans l'ordre inverse pour conserver l'ordre d'affichage
+      for (let i = tracksIds.length - 1; i >= 0; i--) {
+        const id = tracksIds[i];
+        this.logger.debug(`adding track ${id}`);
 
         await axios.put(
           `https://api.spotify.com/v1/me/tracks`,
           {
-            ids: chunk,
+            ids: [id],
           },
           { headers: { Authorization: `Bearer ${spotify_access_token}` } },
         );
@@ -464,6 +464,10 @@ export class PlaylistsService {
   }): Promise<PlaylistResponse> {
     this.logger.log('Sorting playlist by release date', playlistId);
 
+    if (playlistId === 'liked-songs') {
+      throw new HttpException('The playlist Liked Songs can not be sorted', HttpStatus.BAD_REQUEST);
+    }
+
     try {
       const { accessToken: spotify_access_token } = await this.validateUserAndGetAccessToken(userId);
 
@@ -488,15 +492,16 @@ export class PlaylistsService {
       return await this.getUserPlaylistById({ userId, playlistId });
     } catch (error) {
       this.logger.error('Failed to sorting playlist', error.stack);
-      return {
-        error: true,
-        message: error.message,
-      };
+      throw new HttpException('Failed to sorting playlist: ' + error.message, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
   async shufflePlaylist({ userId, playlistId }: { userId: string; playlistId: string }): Promise<PlaylistResponse> {
     this.logger.log(`Shuffling playlist with id ${playlistId}`);
+
+    if (playlistId === 'liked-songs') {
+      throw new HttpException('The playlist Liked Songs can not be shuffled', HttpStatus.BAD_REQUEST);
+    }
 
     try {
       const existingUser = await this.prisma.user.findUnique({
@@ -535,10 +540,7 @@ export class PlaylistsService {
       return await this.getUserPlaylistById({ userId, playlistId });
     } catch (error) {
       this.logger.error('Failed to shuffle playlist', error.stack);
-      return {
-        error: true,
-        message: error.message,
-      };
+      throw new HttpException('Failed to shuffle playlist: ' + error.message, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -591,10 +593,10 @@ export class PlaylistsService {
         const newPlaylist = newPlaylistResponse.data;
 
         this.logger.log(`The new playlist with id ${newPlaylist.id} has been created`);
-        await this.cleanPlaylist({ userId, playlistId: newPlaylist.id });
+        await this.clearPlaylist({ userId, playlistId: newPlaylist.id });
       } else {
         // delete all tracks from the destination playlist
-        await this.cleanPlaylist({ userId, playlistId: playlistDestinationId });
+        await this.clearPlaylist({ userId, playlistId: playlistDestinationId });
       }
 
       // Re-add the tracks in the destination playlist
@@ -604,14 +606,11 @@ export class PlaylistsService {
       return await this.getUserPlaylistById({ userId, playlistId: playlistDestinationId });
     } catch (error) {
       this.logger.error('Failed to copy playlist', error.stack);
-      return {
-        error: true,
-        message: error.message,
-      };
+      throw new HttpException('Failed to copy playlist: ' + error.message, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
-  async cleanPlaylist({ userId, playlistId }: { userId: string; playlistId: string }): Promise<PlaylistResponse> {
+  async clearPlaylist({ userId, playlistId }: { userId: string; playlistId: string }): Promise<PlaylistResponse> {
     this.logger.log(`Cleaning playlist with id ${playlistId}`);
 
     try {
@@ -624,11 +623,8 @@ export class PlaylistsService {
 
       return await this.getUserPlaylistById({ userId, playlistId });
     } catch (error) {
-      this.logger.error('Failed to reorganize playlist', error.stack);
-      return {
-        error: true,
-        message: error.message,
-      };
+      this.logger.error('Failed to clear playlist', error.stack);
+      throw new HttpException('Failed to clear playlist: ' + error.message, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -645,10 +641,7 @@ export class PlaylistsService {
       const { user: existingUser } = await this.validateUserAndGetAccessToken(userId);
 
       if (existingUser.favoritePlaylists.includes(playlistId)) {
-        return {
-          error: true,
-          message: "La playlist fait déjà partie des favoris de l'utilisateur.",
-        };
+        throw new HttpException("La playlist fait déjà partie des favoris de l'utilisateur.", HttpStatus.CONFLICT);
       }
 
       const updatedFavoritePlaylists = existingUser.favoritePlaylists.concat(playlistId);
@@ -661,16 +654,10 @@ export class PlaylistsService {
         },
       });
 
-      return {
-        error: false,
-        favoritePlaylists: updatedFavoritePlaylists,
-      };
+      return { favoritePlaylists: updatedFavoritePlaylists };
     } catch (error) {
       this.logger.error("L'ajout du favoris a échoué", error.stack);
-      return {
-        error: true,
-        message: error.message,
-      };
+      throw new HttpException("L'ajout du favoris a échoué: " + error.message, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -687,10 +674,10 @@ export class PlaylistsService {
       const { user: existingUser } = await this.validateUserAndGetAccessToken(userId);
 
       if (!existingUser.favoritePlaylists.includes(playlistId)) {
-        return {
-          error: true,
-          message: "La playlist ne fait pas partie des favoris de l'utilisateur.",
-        };
+        throw new HttpException(
+          "La playlist ne fait pas partie des playlists auto sort de l'utilisateur.",
+          HttpStatus.NOT_FOUND,
+        );
       } else {
         const updatedFavoritePlaylists: string[] = existingUser.favoritePlaylists.filter(
           (favId) => favId !== playlistId,
@@ -705,16 +692,12 @@ export class PlaylistsService {
         });
 
         return {
-          error: false,
           favoritePlaylists: updatedFavoritePlaylists,
         };
       }
     } catch (error) {
       this.logger.error('La supression du favoris a échouée', error.stack);
-      return {
-        error: true,
-        message: error.message,
-      };
+      throw new HttpException('La supression du favoris a échouée: ' + error.message, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -731,10 +714,7 @@ export class PlaylistsService {
       const { user: existingUser } = await this.validateUserAndGetAccessToken(userId);
 
       if (existingUser.autoSortPlaylists.includes(playlistId)) {
-        return {
-          error: true,
-          message: 'La playlist est déjà en auto sorted.',
-        };
+        throw new HttpException('La playlist est déjà en auto sorted.', HttpStatus.CONFLICT);
       } else {
         const updatedAutoSortPlaylists = existingUser.autoSortPlaylists.concat(playlistId);
         await this.prisma.user.update({
@@ -747,16 +727,15 @@ export class PlaylistsService {
         });
 
         return {
-          error: false,
           autoSortPlaylists: updatedAutoSortPlaylists,
         };
       }
     } catch (error) {
       this.logger.error("L'ajout de la playlist auto sorted a échoué", error.stack);
-      return {
-        error: true,
-        message: error.message,
-      };
+      throw new HttpException(
+        "L'ajout de la playlist auto sorted a échoué: " + error.message,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
@@ -773,13 +752,13 @@ export class PlaylistsService {
       const { user: existingUser } = await this.validateUserAndGetAccessToken(userId);
 
       if (!existingUser.autoSortPlaylists.includes(playlistId)) {
-        return {
-          error: true,
-          message: "La playlist ne fait pas partie des playlists auto sort de l'utilisateur.",
-        };
+        throw new HttpException(
+          "La playlist ne fait pas partie des playlists auto sort de l'utilisateur.",
+          HttpStatus.NOT_FOUND,
+        );
       } else {
         const updatedAutoSortPlaylists = existingUser.autoSortPlaylists.filter(
-          (playlistId: string) => playlistId !== playlistId,
+          (playlistIdToFilter: string) => playlistIdToFilter !== playlistId,
         );
         await this.prisma.user.update({
           where: {
@@ -791,16 +770,15 @@ export class PlaylistsService {
         });
 
         return {
-          error: false,
           autoSortPlaylists: updatedAutoSortPlaylists,
         };
       }
     } catch (error) {
       this.logger.error('La supression de la playlist auto sorted a échouée', error.stack);
-      return {
-        error: true,
-        message: error.message,
-      };
+      throw new HttpException(
+        'La supression de la playlist auto sorted a échouée: ' + error.message,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
