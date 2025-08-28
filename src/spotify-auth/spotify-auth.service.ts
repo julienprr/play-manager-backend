@@ -99,7 +99,6 @@ export class SpotifyAuthService {
     }
 
     const userProfile = await this.getUserProfile({ spotify_access_token });
-    console.log('userProfile: ', userProfile);
 
     const existingUser = await this.prisma.user.findUnique({
       where: {
@@ -208,7 +207,6 @@ export class SpotifyAuthService {
   }
 
   private async getUserProfile({ spotify_access_token }: { spotify_access_token: string }) {
-    console.log('get user profile');
     try {
       const userProfileRes = await axios.get(`https://api.spotify.com/v1/me`, {
         headers: {
@@ -216,7 +214,9 @@ export class SpotifyAuthService {
         },
       });
 
-      console.log('userProfileRes ', userProfileRes.data);
+      if (userProfileRes.status !== 200) {
+        throw new Error(`Spotify responded with ${userProfileRes.status}`);
+      }
 
       let followingTotal = null;
 
@@ -226,7 +226,6 @@ export class SpotifyAuthService {
         },
       });
       followingTotal = userFollowingRes.data.artists.total;
-      console.log('userFollowingRes ', userFollowingRes.data);
 
       return { ...userProfileRes.data, following: followingTotal };
     } catch (error) {

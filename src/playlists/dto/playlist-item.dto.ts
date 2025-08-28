@@ -37,4 +37,8 @@ export class PlaylistItemDto {
   @IsNumber()
   @Expose()
   totalTracks: string;
+
+  @IsNumber()
+  @Expose()
+  tracks: any;
 }
