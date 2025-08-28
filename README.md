@@ -1,92 +1,103 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="200" alt="Nest Logo" /></a>
-</p>
+# Play Manager Backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+➡️ 🇫🇷 [French version](README.fr.md)
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://coveralls.io/github/nestjs/nest?branch=master" target="_blank"><img src="https://coveralls.io/repos/github/nestjs/nest/badge.svg?branch=master#9" alt="Coverage" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+This is the backend of the [**Spotify Profile**](https://github.com/julienprr/spotify-profile-frontend) application. It is built with **NestJS** and interacts with the Spotify API to allow users to manage their playlists: favorites, auto-sorting, copying tracks, etc.
 
-## Description
+---
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Main Features
 
-## Installation
+- Authentication via Spotify (Authorization Code Flow)
+- Fetching the user's playlists
+- Adding/Removing favorite playlists
+- Enabling/Disabling automatic playlist sorting
+- Sorting playlists by track release date
+
+## Technologies Used
+
+- [NestJS](https://nestjs.com/)
+- [Prisma](https://www.prisma.io/)
+- [PostgreSQL](https://www.postgresql.org/)
+- [Spotify Web API](https://developer.spotify.com/documentation/web-api/)
+- [Class Validator / Transformer](https://github.com/typestack/class-validator)
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js >= 18
+- PostgreSQL database
+- Spotify Developer credentials (client ID, client secret, and redirect URI)
+
+---
+
+### Installation
 
 ```bash
-$ npm install
+git clone https://github.com/your-username/play-manager-backend.git
+cd play-manager-backend
+npm install
 ```
 
-## Running the app
+### Environment Variables
+
+Create a `.env` file at the root with the following variables:
+
+```env
+DATABASE_URL=postgresql://user:password@localhost:5432/playmanager
+SPOTIFY_CLIENT_ID=your_spotify_client_id
+SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
+SPOTIFY_REDIRECT_URI=http://localhost:5173/callback
+JWT_SECRET=your_jwt_secret
+```
+
+### Running the App
 
 ```bash
 # development
-$ npm run start
+npm run dev
 
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+# production
+npm run build
+npm run start:prod
 ```
 
-## Test
+Api will be available at [http://localhost:8000/doc](http://localhost:8000/doc).
+
+### Database
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+npx prisma migrate dev
+npx prisma studio
 ```
 
-## Authorization Code Flow
+## Project Structure
 
-Redirection de l'utilisateur vers la page d'autorisation :
+```
+src/
+├── auth/              # Authentication (Spotify OAuth2)
+├── playlists/         # Playlist management
+├── users/             # User entity and logic
+├── common/            # DTOs, interceptors, decorators
+├── prisma.service.ts  # Prisma integration
+├── main.ts            # App entrypoint
+```
 
-L'application redirige l'utilisateur vers la page d'autorisation de Spotify en utilisant l'URL d'autorisation.
-L'utilisateur se connecte à Spotify et autorise l'application à accéder à certaines informations (comme les playlists).
-Spotify redirige vers l'URI de redirection avec un code d'autorisation :
+## API
 
-Après avoir autorisé l'application, Spotify redirige l'utilisateur vers l'URI de redirection que tu as configurée, avec un code d'autorisation dans l'URL.
-Échange du code d'autorisation contre un token d'accès :
+The backend exposes REST endpoints for managing playlists. All endpoints are protected by JWT.
 
-Ton application serveur (Nest.js) capture ce code et envoie une requête POST à l'API de Spotify pour échanger ce code contre un token d'accès (access_token) et éventuellement un token de rafraîchissement (refresh_token).
-Utilisation du token d'accès :
+You can test the API with tools like Postman or directly through your frontend.
 
-Le token d'accès (access_token) peut alors être utilisé pour faire des requêtes authentifiées à l'API de Spotify, par exemple pour récupérer les playlists de l'utilisateur.
-Rafraîchissement du token d'accès (facultatif) :
+## Development Notes
 
-Si le token d'accès expire, le token de rafraîchissement (refresh_token) peut être utilisé pour obtenir un nouveau token d'accès sans nécessiter que l'utilisateur se reconnecte.
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://kamilmysliwiec.com)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+- Code style follows ESLint rules.
+- DTOs are validated using `class-validator`.
+- Errors are thrown using `HttpException` with appropriate status codes.
 
 ## License
 
-Nest is [MIT licensed](LICENSE).
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
